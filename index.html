@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ZrnSelectiveSuspend</title>
-<meta name="description" content="Power a GPU off, move its programs to another GPU while they draw, or lend it to a virtual machine, on a running Linux desktop. Setup, use and internals.">
+<meta name="description" content="Take the graphics card out of a running Linux desktop and give it back: programs move to the other GPU while they draw, the card is switched off or lent to a virtual machine, and a card that loses power comes back without a reboot. Setup, use and internals.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
@@ -425,7 +425,7 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
       <div>
-        <p class="lead" id="hero-title">ZrnSelectiveSuspend (ZSS) takes a graphics card out of service on a live Linux desktop. The programs drawing on it move to another GPU while they draw. The card is then powered off, or lent to a virtual machine. When it returns, everything moves back. No reboot, no log-out.</p>
+        <p class="lead" id="hero-title">ZrnSelectiveSuspend (ZSS) takes the graphics card out of a running Linux desktop and gives it back, without closing anything: programs on it move to the other GPU while they draw, and back when it returns. If it loses power without warning, the desktop carries on and the card comes back without a reboot.</p>
         <div class="actions">
           <a class="btn" href="#install">Install</a>
           <a class="btn ghost" href="#demos">Watch it</a>
@@ -445,7 +445,7 @@
           <li><span>Powers the discrete GPU off and on without crashing the X session</span></li>
           <li><span>Lends the GPU to a virtual machine with no reboot, and takes it back</span></li>
           <li><span>Recovers a GPU that loses power mid-frame, without a reboot</span></li>
-          <li><span>Chromium, VS Code and Unity games keep drawing while they move</span></li>
+          <li><span>Chromium, Electron apps and Unity games keep drawing while they move</span></li>
           <li><span>Switches off on battery and back on at the charger, programs moved</span></li>
         </ul>
       </div>
