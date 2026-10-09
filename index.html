@@ -271,6 +271,12 @@
   .qa dd p { margin: 0 0 0.5em; }
   .qa dd p:last-child { margin: 0; }
 
+  .demo { border: 1px solid var(--line); background: var(--panel); margin: 0 0 1.75rem; }
+  .demo video { display: block; width: 100%; height: auto; background: #000; }
+  .demo figcaption { border-top: 1px solid var(--line); padding: 0.75rem 1rem; font-size: 0.9375rem; }
+  .demo figcaption b { display: block; font-weight: 500; margin-bottom: 0.25rem; }
+  .demo figcaption p { margin: 0 0 0.5em; color: var(--mute); max-width: none; }
+  .demo figcaption p:last-child { margin: 0; }
   .diagram { border: 1px solid var(--line); background: var(--panel); margin-bottom: 1.25rem; overflow-x: auto; }
   .diagram svg { min-width: 640px; width: 100%; height: auto; }
   .diagram figcaption { border-top: 1px solid var(--line); padding: 0.6rem 0.9rem; font-size: 0.875rem; color: var(--mute); }
@@ -376,6 +382,7 @@
     <ul>
       <li class="group">Start</li>
       <li><a href="#top">Overview</a></li>
+      <li><a href="#demos">Demos</a></li>
       <li><a href="#what">What it does</a></li>
       <li><a href="#install">Installing</a></li>
       <li><a href="#hardware">Will it work here?</a></li>
@@ -421,6 +428,7 @@
         <p class="lead" id="hero-title">ZrnSelectiveSuspend (ZSS) takes a graphics card out of service on a live Linux desktop. The programs drawing on it move to another GPU while they draw. The card is then powered off, or lent to a virtual machine. When it returns, everything moves back. No reboot, no log-out.</p>
         <div class="actions">
           <a class="btn" href="#install">Install</a>
+          <a class="btn ghost" href="#demos">Watch it</a>
           <a class="btn ghost" href="#architecture">How it works</a>
           <a class="btn ghost" href="#testing">Help test it</a>
         </div>
@@ -479,6 +487,34 @@
   </section>
 
   <!-- ============================== START ============================== -->
+  <section class="section" id="demos">
+    <div class="wrap">
+      <div><p class="kicker">Start</p><h2>Demos</h2><p class="sub">Recorded on the MacBook Pro, 9 October 2026. No cuts except where noted.</p></div>
+      <div class="prose">
+        <figure class="demo">
+          <video controls muted playsinline preload="metadata" poster="assets/demo-power-off-on.jpg">
+            <source src="assets/demo-power-off-on.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            <b>Switching the GT 650M off and on under a running X session</b>
+            <p>Top left, <code>intel_gpu_top</code> on the Intel GPU; bottom left, <code>nvidia-smi</code> every second. The cube is <code>vkcube</code> started with <code>zss-run</code>, drawing on the NVIDIA card.</p>
+            <p><code>zssctl off</code> moves the cube and Teams to the Intel GPU, suspends the driver and cuts the card's power through the gmux (0.66 s). <code>nvidia-smi</code> can't find the card and <code>lspci -x</code> reads all <code>ff</code>: no power. <code>zssctl on</code> brings it back in about a second and the programs move home. The cube never stops.</p>
+          </figcaption>
+        </figure>
+        <figure class="demo">
+          <video controls muted playsinline preload="metadata" poster="assets/demo-gpu-passthrough.jpg">
+            <source src="assets/demo-gpu-passthrough.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            <b>Lending the card to a virtual machine and taking it back, without a reboot</b>
+            <p><code>zssctl lend</code> moves the cube off the card and hands it, with its audio function and the Thunderbolt controller in its isolation group, to <code>vfio-pci</code> (1.1 s). A CachyOS live image then boots in QEMU with the card passed through; the boot is sped up. Inside the guest, <code>lspci</code> shows the GT 650M and the guest's <code>nouveau</code> reads its chip ID. After the guest shuts down, <code>zssctl reclaim</code> power-cycles the card and gives it back to the host's driver (4.6 s), and the cube moves back.</p>
+            <p>The guest's driver stops after reading the chip: the Mac Edition card carries no video BIOS of its own, so <code>nouveau</code> finds none. Giving QEMU a copy of it (<code>romfile=</code>) is the next step. One failed launch, a permissions error on <code>/dev/vfio</code>, is cut out.</p>
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
   <section class="section" id="what">
     <div class="wrap">
       <div><p class="kicker">Start</p><h2>What it does</h2><p class="sub">Three things a running desktop normally can't do with its graphics card.</p></div>
