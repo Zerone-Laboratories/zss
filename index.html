@@ -444,7 +444,7 @@
           <li><span>Moves running Vulkan and OpenGL programs between GPUs mid-draw</span></li>
           <li><span>Powers the discrete GPU off and on without crashing the X session</span></li>
           <li><span>Lends the GPU to a virtual machine with no reboot, and takes it back</span></li>
-          <li><span>Recovers a GPU that lost power while idle, without a reboot</span></li>
+          <li><span>Recovers a GPU that loses power mid-frame, without a reboot</span></li>
           <li><span>Chromium, VS Code and Unity games keep drawing while they move</span></li>
           <li><span>Switches off on battery and back on at the charger, programs moved</span></li>
         </ul>
@@ -469,7 +469,7 @@
             <dt>Memory</dt><dd>16 GB</dd>
             <dt>Integrated GPU</dt><dd>Intel HD Graphics 4000 (<code>i915</code>, Mesa <code>hasvk</code>)</dd>
             <dt>Discrete GPU</dt><dd>NVIDIA GeForce GT 650M Mac Edition, 512 MB, Kepler GK107</dd>
-            <dt>GPU driver</dt><dd>NVIDIA 470.256.02 with the ZSS patch, revision 5</dd>
+            <dt>GPU driver</dt><dd>NVIDIA 470.256.02 with the ZSS patch, revision 6</dd>
             <dt>Display switch</dt><dd>Apple gmux, classic (v1.9.35)</dd>
             <dt>Thunderbolt</dt><dd>Intel CV82524 “Lightridge”</dd>
             <dt>Panel</dt><dd>15.4-inch, 1440 × 900</dd>
@@ -526,7 +526,7 @@
         </div>
         <h3>Also</h3>
         <ul>
-          <li><b>Survives a card that vanishes while idle.</b> A card that loses power without warning is noticed within about a tenth of a second. Its driver is frozen before it can hang the machine, and <code>zssctl on</code> brings back the card and its driver without a reboot.</li>
+          <li><b>Survives a card that vanishes, even mid-frame.</b> A card that loses power without warning is noticed within about a tenth of a second, and the desktop carries on. Programs drawing on it are rebuilt on the other GPU. <code>zssctl on</code> brings the card back without a reboot: if its driver was frozen in time it resumes, and if the driver saw the loss the card is taken off the bus and found again, the way NVIDIA's driver handles an unplugged eGPU.</li>
           <li><b>Rebuilds programs after a loss.</b> Programs under ZSS_AirLock whose GPU disappears are rebuilt from memory on another GPU, or parked until one is available.</li>
           <li><b>Follows the charger.</b> Unplug it and the card switches off with its programs moved; plug it back in and they return.</li>
           <li><b>Idle timer.</b> An unused card can be switched off after a set time and comes back when something asks for it.</li>
@@ -539,7 +539,7 @@
           <li>It doesn't start or configure virtual machines. It prepares the host side, and any passthrough setup works after that.</li>
           <li>It never edits your bootloader configuration. Switching the IOMMU on, if you want lending, is your step.</li>
           <li>It can't move a program that wasn't started under ZSS_AirLock. Such a program is frozen, or it blocks the operation.</li>
-          <li>It can't yet recover a card that loses power <em>while a program is rendering on it</em>. The kernel and background processes survive, but the display server may hang and the card needs a reboot. A card you switch off with <code>zssctl off</code> is never in that state. See <a href="#loss">When a card is lost unexpectedly</a>.</li>
+          <li>After a card lost mid-frame comes back, the programs that were moved off it stay on the other GPU until you restart them, and programs that present through NVIDIA's own driver (not through ZSS_AirLock) need a reboot. See <a href="#loss">When a card is lost unexpectedly</a>.</li>
         </ul>
       </div>
     </div>
@@ -550,7 +550,7 @@
       <div><p class="kicker">Start</p><h2>Installing</h2><p class="sub">One command, or look first with <code>--check</code>.</p></div>
       <div class="prose">
         <div class="pre" aria-label="Before you start">
-          <div><h4>Needs</h4><ul><li><code>sudo</code> rights.</li><li>Arch Linux, or a distribution whose libraries are as new (see <a href="#releases">Releases</a>). Otherwise <a href="#build">build from source</a>.</li><li>For the driver patch: NVIDIA 470.256.02, DKMS and headers for the running kernel.</li><li>For ZSS_Interceptor: DKMS and headers for the running kernel.</li></ul></div>
+          <div><h4>Needs</h4><ul><li><code>sudo</code> rights.</li><li>glibc 2.34 or later: Debian 12, Ubuntu 22.04 and newer, Fedora, openSUSE Tumbleweed, Arch Linux (see <a href="#releases">Releases</a>). Otherwise <a href="#build">build from source</a>.</li><li>For the driver patch: NVIDIA 470.256.02, DKMS and headers for the running kernel.</li><li>For ZSS_Interceptor: DKMS and headers for the running kernel.</li></ul></div>
           <div><h4>Assumes</h4><ul><li>An X11 session. Wayland compositors are recognised but untested.</li><li>No other tool switches the discrete GPU's power (bbswitch, optimus-manager, envycontrol and the like).</li><li>You can reach a text console (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>F2</kbd>) if the desktop stops answering.</li></ul></div>
           <div class="warn"><h4>Watch out</h4><ul><li>The driver patch rebuilds the NVIDIA module. The stock modules are kept and put back at boot if the patched one doesn't load, but save your work first.</li><li>If the GPU driver is in the initial ramdisk, it is regenerated. The installer says so before it does.</li><li>Nothing is powered off during installation. <code>--check</code> changes nothing at all.</li></ul></div>
         </div>
@@ -616,7 +616,7 @@ zssctl on 0000:01:00.0         <span class="c"># switch it on and bring the prog
 
         <h3 id="releases">Releases</h3>
         <p>Every push to the main branch builds, tests and publishes a release on GitHub with two downloads: <code>zss-installer-VERSION.run</code> and <code>zss-tester-VERSION.run</code>. <code>zss-installer.run</code> and <code>zss-tester.run</code> are the same files under names that never change, which is what the one-liners use. Versions are <code>MAJOR.MINOR.PATCH</code>; the patch number counts up with each release.</p>
-        <p>Both files are built on Arch Linux, so they need a distribution whose libraries are about as new. On an older system, <a href="#build">build from source</a>.</p>
+        <p>Both files are built on Ubuntu 22.04 and tested on Arch Linux, and need glibc 2.34 or later. Install, <code>--check</code>, uninstall and the tester kit were tried on Debian 12, Ubuntu 22.04 and 24.04, Fedora 44 and openSUSE Tumbleweed. On an older system, <a href="#build">build from source</a>.</p>
 
         <h3 id="uninstall">Removing it</h3>
         <pre><code>sh zss-installer.run --unpack-only ~/zss-installer
@@ -648,7 +648,7 @@ zss-nvidia-patch remove                                <span class="c"># if you 
             <tr><td>Cutting power: PCIe hot-plug slot</td><td>Any driver, on a hot-plug slot</td><td>QEMU only</td></tr>
             <tr><td>Power-off under a running display server</td><td><b>NVIDIA 470.256.02 with the patch only</b></td><td>MacBookPro9,1</td></tr>
             <tr><td>Recovering card and driver after a sudden power loss, card idle</td><td>NVIDIA 470.256.02 with the patch; drivers with PCI error handlers in principle</td><td>MacBookPro9,1</td></tr>
-            <tr><td>The same, with a program rendering on the card</td><td><b>Nothing yet</b></td><td>Failed on MacBookPro9,1</td></tr>
+            <tr><td>The same, with a program rendering on the card</td><td>NVIDIA 470.256.02 with patch revision 6 (the card is taken off the bus and found again, as an unplugged eGPU)</td><td>MacBookPro9,1, card out of X</td></tr>
             <tr><td>Hiding a switched-off GPU from new programs</td><td>Device nodes: any driver. Loader and <code>/proc</code> files: NVIDIA only</td><td>MacBookPro9,1</td></tr>
           </tbody>
         </table></div>
@@ -890,32 +890,40 @@ zssctl reclaim 0000:01:00.0 --stay   <span class="c"># the same, leaving program
       <div><p class="kicker">Use</p><h2>When a card is lost unexpectedly</h2><p class="sub">A card that loses power without being switched off first.</p></div>
       <div class="prose">
         <div class="pre" aria-label="Before you start">
-          <div><h4>Needs</h4><ul><li>ZSS_Interceptor loaded, to notice the loss within a tenth of a second.</li><li>The patched NVIDIA driver, for it to be frozen before it finds out. Other drivers need PCI error handlers.</li></ul></div>
-          <div><h4>Assumes</h4><ul><li>The card was idle when it went. That case is recovered cleanly without a reboot.</li><li><code>loss_while_busy</code> is left at <code>leave</code> unless you know you want otherwise.</li></ul></div>
-          <div class="warn"><h4>Watch out</h4><ul><li>If a program was rendering on the card when it went, the kernel and background processes survive, but the display server may hang and the card needs a reboot. Save your work. Switching off with <code>zssctl off</code> instead never leads here.</li><li><code>loss_while_busy = freeze</code> stops the display server until the card is back. Don't set it on a machine you use.</li><li>Don't run <code>zssctl on</code> repeatedly while it refuses: it is refusing because resuming the driver under stuck programs hung the machine in testing.</li></ul></div>
+          <div><h4>Needs</h4><ul><li>ZSS_Interceptor loaded, to notice the loss within a tenth of a second.</li><li>The patched NVIDIA driver, revision 6, to bring the card back whether or not the driver saw the loss. Other drivers need PCI error handlers.</li><li>The card out of the X configuration (install with <code>--vm-passthrough</code>), so that the display server never waits on it.</li></ul></div>
+          <div><h4>Assumes</h4><ul><li>Nothing about what was running: an idle card and a card being rendered on both come back without a reboot.</li><li><code>loss_while_busy</code> is left at <code>leave</code> unless you know you want otherwise.</li></ul></div>
+          <div class="warn"><h4>Watch out</h4><ul><li>Until <code>zssctl on</code>, the card's device files are hidden: a monitor such as <code>nvtop</code> or <code>nvidia-smi</code> that reached the driver that had given the card up could take the desktop with it.</li><li>Programs that were moved off the card stay on the other GPU after it comes back; restart them to use the card. Programs that present through NVIDIA's own driver need a reboot.</li><li><code>loss_while_busy = freeze</code> stops the display server until the card is back. Don't set it on a machine you use.</li><li>If <code>zssctl on</code> refuses, read the reason before trying again: every refusal stands for something that hung the machine in testing.</li></ul></div>
         </div>
-        <p>A card that stops answering, or leaves the bus unexpectedly, is noticed by ZSS_Interceptor within about a tenth of a second. It is marked disconnected, and its driver is told through the kernel's PCI error-recovery handlers if it has them, or frozen if it is the patched NVIDIA driver. What follows depends on whether the card was in use. Here is what happened in real power cuts on the reference laptop:</p>
+        <p>A card that stops answering, or leaves the bus unexpectedly, is noticed by ZSS_Interceptor within about a tenth of a second. It is marked disconnected, and its driver is told through the kernel's PCI error-recovery handlers if it has them, or frozen if it is the patched NVIDIA driver. What follows depends on whether the driver noticed before ZSS did. Here is what happened in real power cuts on the reference laptop, with the card out of X:</p>
         <div class="table-scroll"><table>
           <thead><tr><th scope="col">The card was</th><th scope="col">The desktop</th><th scope="col">Programs on the card</th><th scope="col">Getting the card back</th></tr></thead>
           <tbody>
             <tr><td>Idle</td><td>Carries on</td><td>None</td><td><code>zssctl on</code>: power, PCI state and driver restored, no reboot</td></tr>
-            <tr><td>Being rendered on</td><td>Carries on</td><td>Stuck: frozen out of the driver, not moved</td><td><b>A reboot.</b> <code>zssctl on</code> refuses while stuck programs hold the card</td></tr>
+            <tr><td>Being rendered on</td><td>Carries on</td><td>Rebuilt on the Intel GPU in about 3.5 s, nothing lost</td><td><code>zssctl on</code>: the card is taken off the bus, powered and found again by the driver, in 4 to 7 s. No reboot</td></tr>
           </tbody>
         </table></div>
-        <pre><code>zssctl status                 <span class="c"># state=lost, driver=frozen</span>
-zssctl on 0000:01:00.0        <span class="c"># tries to restore power, then resumes the driver</span></code></pre>
-        <h3>Why the busy case fails</h3>
-        <p>A program that is rendering calls into the driver many times in the tenth of a second it takes to notice the loss, so the driver finds out first. Once the driver is frozen, the program's calls sleep, so ZSS_AirLock can't move it. Resuming the driver under a program whose state on the card is gone hung the machine in testing, which is why the daemon now refuses to do it.</p>
+        <pre><code>zssctl status                 <span class="c"># state=lost</span>
+zssctl on 0000:01:00.0        <span class="c"># resumes a frozen driver, or replugs the card the driver gave up</span></code></pre>
+        <h3>How a card the driver gave up comes back</h3>
+        <p>A program that is rendering calls into the driver many times in the tenth of a second it takes to notice the loss, so the driver usually finds out first (<code>Xid 79 … GPU has fallen off the bus</code>). From then on NVIDIA's driver won't use the card again, and every ordinary way of taking it off the card waits forever: unbinding it, or unloading the modules stacked on it.</p>
+        <p>NVIDIA's driver does allow one device to leave with programs still holding it: an eGPU pulled from its Thunderbolt port. Patch revision 6 lets ZSS mark the lost card that way. <code>zssctl on</code> then:</p>
+        <ol class="steps">
+          <li><span>marks the card as unplugged (<code>/proc/driver/nvidia/zss_hold</code>);</span></li>
+          <li><span>takes its functions off the PCI bus while its power is still off, each step with a time limit, so the driver lets go;</span></li>
+          <li><span>switches the power rail on and rescans the bridge above the card;</span></li>
+          <li><span>waits for <code>nvidia</code> to find the card as a new device, and manages it again.</span></li>
+        </ol>
+        <p>Tried twice on 9 October 2026 with <code>vkcube</code> rendering and <code>btop</code> polling the card: X answered throughout, <code>vkcube</code> moved to Intel with its picture intact, and afterwards <code>nvidia-smi</code> answered and a new program rendered on the card. The card comes back as <code>/dev/nvidia1</code>; the old device number is freed when its last holder closes it.</p>
         <h3>The <code>loss_while_busy</code> setting</h3>
         <div class="table-scroll"><table>
           <thead><tr><th scope="col">Value</th><th scope="col">What happens when the card vanishes while in use</th></tr></thead>
           <tbody>
-            <tr><td class="k"><code>leave</code> (default)</td><td>The driver finds out for itself. Programs get errors and are moved, the display server carries on, and the card stays unusable until the driver is reloaded (for NVIDIA: until you log out).</td></tr>
+            <tr><td class="k"><code>leave</code> (default)</td><td>The driver finds out for itself. Programs get errors and are moved, the display server carries on, and <code>zssctl on</code> brings the card back by replugging it (patch revision 6).</td></tr>
             <tr><td class="k"><code>refuse</code></td><td>The driver is frozen and turns callers away at once. Programs are moved, the display server isn't held, and the driver can still be given the card back. Needs patch revision 5; not yet proven on hardware.</td></tr>
             <tr><td class="k"><code>freeze</code></td><td>The driver is frozen and callers wait: the display server stops.</td></tr>
           </tbody>
         </table></div>
-        <p>When the card is idle the driver is always frozen, which is what lets it come back without a reboot. Programs under ZSS_AirLock on a lost card are rebuilt on another GPU from what ZSS_AirLock kept in memory (see <code>ZSS_RETAIN</code>), or parked.</p>
+        <p>When the card is idle the driver is frozen if ZSS gets there first, and then it simply resumes. Programs under ZSS_AirLock on a lost card are rebuilt on another GPU from what ZSS_AirLock kept in memory (see <code>ZSS_RETAIN</code>), or parked.</p>
       </div>
     </div>
   </section>
@@ -1034,6 +1042,19 @@ sudo ./packaging/uninstall.sh        <span class="c"># removes it again afterwar
         <p>A program is offered Vulkan 1.1 with the features and limits that every GPU it might move to has, including the number of queues. Nothing it enables can then hold it to one card. <code>ZSS_PROFILE=native</code> switches this off.</p>
         <h3>Standing in for missing features</h3>
         <p>Some extensions are offered on every GPU and emulated where a driver lacks them. Dynamic rendering is lowered to cached render passes and framebuffers. <code>VK_KHR_maintenance5</code> is mapped onto older calls. That is what lets Zink, and so OpenGL, run on the NVIDIA 470 driver. Also offered: timeline semaphores, extended dynamic state, robustness2, conditional rendering, custom border colours, line rasterisation, transform feedback, sampler Y′CbCr conversion and more.</p>
+        <h3 id="speed">What it costs</h3>
+        <p>The same programs measured with and without ZSS_AirLock on the reference laptop, frames per second, median of three:</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Program</th><th scope="col">Without ZSS_AirLock</th><th scope="col">Under ZSS_AirLock</th></tr></thead>
+          <tbody>
+            <tr><td>vkcube on Intel</td><td>1004</td><td>947</td></tr>
+            <tr><td>vkcube on NVIDIA, shown on the Intel screen</td><td>about 1530</td><td>861</td></tr>
+            <tr><td>glxgears through Zink on Intel</td><td>1175</td><td>549 to 655</td></tr>
+            <tr><td>glxgears through Zink on NVIDIA</td><td>—</td><td>1077</td></tr>
+          </tbody>
+        </table></div>
+        <p>Two costs were found and removed on 9 October. Frames from the NVIDIA card were held to the refresh rate whatever a program asked for; the presenter now uses the program's own present mode. And every submission copied all of a program's mapped memory to the GPU, about 5 GB a second for <code>glxgears</code>; now the kernel reports which pages were written (userfaultfd write protection with <code>PAGEMAP_SCAN</code>, Linux 6.7 and later) and only those are copied.</p>
+
         <h3 id="presenter">Presenting on the screen's GPU</h3>
         <p>A program may draw on one GPU while another drives the screen. Mesa's drivers hand frames across in order themselves. The NVIDIA proprietary driver only does that when the X server has its card. Without that, ZSS_AirLock does it:</p>
         <ul>
@@ -1113,12 +1134,13 @@ sudo ./packaging/uninstall.sh        <span class="c"># removes it again afterwar
         <ul>
           <li><b>Wake on touch.</b> A caller arriving while the driver is suspended asks for a wake and sleeps, instead of spinning forever. That is how the display server can borrow a switched-off card for a moment.</li>
           <li><b>Freeze.</b> The driver can be shut to every caller without anything being asked of the card, for the moment a card vanishes, and resumed when the card is back. Revision 5 can also turn callers away at once instead of making them wait (<code>loss_while_busy = refuse</code>).</li>
+          <li><b>Unplugged.</b> Revision 6: a card whose driver saw it vanish can be marked the way the driver marks an eGPU pulled from its port, so that it can be taken off the bus with programs still holding it and found again by a rescan. That is what brings a card lost mid-frame back without a reboot.</li>
         </ul>
         <pre><code>zss-nvidia-patch status     <span class="c"># driver version, whether it's validated, whether the patch is in</span>
 zss-nvidia-patch apply
 zss-nvidia-patch remove     <span class="c"># put the stock driver back</span></code></pre>
         <ul>
-          <li>Validated against <b>470.256.02</b> so far (revision 5). The installer offers it only for a validated version.</li>
+          <li>Validated against <b>470.256.02</b> so far (revision 6). The installer offers it only for a validated version.</li>
           <li>It is applied through DKMS on your machine, to the copy of the driver you installed, so it follows kernel updates. A pacman hook re-applies it after a driver update.</li>
           <li>The stock modules are kept, and restored at boot if the patched driver doesn't load.</li>
           <li>ZSS doesn't ship or modify NVIDIA's driver itself. The lines the patch adds are under the MIT licence so that they can be built into NVIDIA's driver.</li>
@@ -1258,6 +1280,7 @@ zss-nvidia-patch remove     <span class="c"># put the stock driver back</span></
             <tr><td class="k"><code>ZSS_ALLOW_SOFTWARE</code></td><td>Let a parked program resume on the CPU renderer.</td></tr>
             <tr><td class="k"><code>ZSS_RETAIN</code></td><td>Where uploaded textures are kept to survive a lost GPU: <code>disk</code> (default), <code>ram</code>, <code>off</code>.</td></tr>
             <tr><td class="k"><code>ZSS_RETAIN_LIMIT_MB</code>, <code>ZSS_RETAIN_QUEUE_MB</code></td><td>Size cap of that store (4096) and of data waiting to be written (256).</td></tr>
+            <tr><td class="k"><code>ZSS_WRITE_WATCH</code></td><td><code>0</code>: copy a program's mapped memory to the GPU whole at every submission. Default: only the pages written since the last one (Linux 6.7 or later).</td></tr>
             <tr><td class="k"><code>ZSS_REAL_DRIVER_FILES</code></td><td>Colon-separated driver manifests to use instead of the system's.</td></tr>
             <tr><td class="k"><code>ZSS_TRAP</code></td><td>Debugging: a Vulkan command ZSS_AirLock doesn't provide stops the program with that command's name.</td></tr>
             <tr><td class="k"><code>ZSS_BIND_PCI</code></td><td>Test aid: the CPU renderer poses as the PCI device at that address.</td></tr>
@@ -1320,7 +1343,7 @@ sudo ./packaging/install.sh         <span class="c"># install</span></code></pre
           <div><dt>Text flickers back a frame while typing</dt><dd><p>Frames from the discrete card weren't reaching the screen in order. ZSS_AirLock now presents through the screen's GPU where needed. If you set <code>ZSS_PRESENT=direct</code>, remove it.</p></dd></div>
           <div><dt>Lending is refused: modules still in use</dt><dd><p>Something still uses <code>nvidia_drm</code> or its neighbours, often the display server or login manager. Install with <code>--vm-passthrough</code> and reboot, so that they stay off the card's display nodes.</p></dd></div>
           <div><dt>QEMU refuses the group (“no interrupt remapping”)</dt><dd><p>The firmware's interrupt-remapping table is broken. Allow unsafe interrupts for that run only: see <a href="#lend-mbp">On the reference laptop</a>.</p></dd></div>
-          <div><dt>The card was lost while a game was running</dt><dd><p>Not recoverable yet: the desktop survives, but the card needs a reboot. <code>zssctl status</code> shows <code>state=lost</code>.</p></dd></div>
+          <div><dt>The card was lost while a game was running</dt><dd><p><code>zssctl status</code> shows <code>state=lost</code>, and the card's device files are hidden. Run <code>zssctl on</code>: the card is replugged and found again (patch revision 6). The game keeps running on the Intel GPU; restart it to use the card again. A program that draws through NVIDIA's own driver rather than ZSS_AirLock needs a reboot.</p></dd></div>
           <div><dt>Something went wrong during installation</dt><dd><p>The installer saved a report in <code>~/.zss/</code> and offered to send it. <code>~/.zss/debug.log</code> holds the facts and the installer's own messages either way.</p></dd></div>
         </dl>
         <h3>Where to look</h3>
