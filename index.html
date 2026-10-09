@@ -425,7 +425,7 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
       <div>
-        <p class="lead" id="hero-title">ZrnSelectiveSuspend (ZSS) takes the graphics card out of a running Linux desktop and gives it back, without closing anything: programs on it move to the other GPU while they draw, and back when it returns. If it loses power without warning, the desktop carries on and the card comes back without a reboot.</p>
+        <p class="lead" id="hero-title">ZrnSelectiveSuspend (ZSS) takes the graphics card out of a running Linux desktop and gives it back with no reboot and no new session: the kernel, the desktop and its programs stay up throughout, even if the card loses power without warning. Programs on the card move to the other GPU while they draw, and back when it is switched on.</p>
         <div class="actions">
           <a class="btn" href="#install">Install</a>
           <a class="btn ghost" href="#demos">Watch it</a>
@@ -445,7 +445,7 @@
           <li><span>Powers the discrete GPU off and on without crashing the X session</span></li>
           <li><span>Lends the GPU to a virtual machine with no reboot, and takes it back</span></li>
           <li><span>Recovers a GPU that loses power mid-frame, without a reboot</span></li>
-          <li><span>Chromium, Electron apps and Unity games keep drawing while they move</span></li>
+          <li><span>Chromium, Electron and Unity games keep drawing while they move</span></li>
           <li><span>Switches off on battery and back on at the charger, programs moved</span></li>
         </ul>
       </div>
