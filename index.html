@@ -302,27 +302,39 @@
   }
   @media (max-width: 860px) {
     html { scroll-padding-top: 1rem; }
-    .topbar { position: static; flex-wrap: wrap; }
-    .cmd { max-width: none; width: 100%; }
-    .layout { grid-template-columns: 1fr; }
-    .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 0.75rem clamp(1rem, 4vw, 2.5rem); overflow: visible; }
+    body { overflow-x: hidden; }
+    .topbar { position: static; flex-direction: column; align-items: stretch; gap: 0.75rem; }
+    .brand { justify-content: space-between; width: 100%; }
+    .cmd { max-width: 100%; width: 100%; }
+    .cmd code { font-size: 0.75rem; }
+    .layout { display: block; }
+    .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 0.75rem 1rem; overflow: visible; }
     .side-top { display: flex; }
     .menu-btn { display: inline-block; }
     .side-nav { display: none; margin-top: 1rem; }
     .side-nav.open { display: flex; }
-    .side-foot { margin-top: 1rem; }
+    .side-nav.searching { display: flex; }
+    .results { max-height: 50vh; overflow-y: auto; }
+    .pre { grid-template-columns: 1fr; }
+    .pre > div { border-right: 0; border-bottom: 1px solid var(--line); }
+    .pre > div:last-child { border-bottom: 0; }
+    .features li { display: block; padding-left: 1.5rem; position: relative; word-break: normal; overflow-wrap: break-word; }
+    .features li::before { position: absolute; left: 0.6rem; top: 0.3rem; }
+    .features li code { white-space: nowrap; }
   }
   @media (max-width: 600px) {
     .device-info { grid-template-columns: 1fr; }
     .device-info > :first-child { border-right: 0; border-bottom: 1px solid var(--line); }
-    .stats { grid-template-columns: 1fr; }
-    .stats > div { border-right: 0; border-bottom: 1px solid var(--line); }
-    .stats > div:last-child { border-bottom: 0; }
     .cmd .label { display: none; }
     .versions { grid-template-columns: 1fr; }
     .versions > div { border-right: 0; border-bottom: 1px solid var(--line); }
     .versions > div:last-child { border-bottom: 0; }
-    .platforms li { font-size: 0.6875rem; }
+    .platforms { grid-template-columns: repeat(3, 1fr); }
+    .platforms li:nth-child(3) { border-right: 0; }
+    .platforms li:nth-child(4), .platforms li:nth-child(5) { border-top: 1px solid var(--line); }
+    .platforms li:last-child { border-right: 0; }
+    .actions { flex-direction: column; }
+    .actions .btn { width: 100%; text-align: center; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
@@ -371,7 +383,7 @@
       <li><a href="#move">Moving programs by hand</a></li>
       <li><a href="#battery">On battery</a></li>
       <li><a href="#lend">Lending to a virtual machine</a></li>
-      <li><a href="#loss">When a card is lost</a></li>
+      <li><a href="#loss">When a card is lost unexpectedly</a></li>
       <li><a href="#testing">Helping test it</a></li>
       <li class="group">How it works</li>
       <li><a href="#architecture">The three parts</a></li>
@@ -490,7 +502,7 @@
           <li>It doesn't start or configure virtual machines. It prepares the host side, and any passthrough setup works after that.</li>
           <li>It never edits your bootloader configuration. Switching the IOMMU on, if you want lending, is your step.</li>
           <li>It can't move a program that wasn't started under ZSS_AirLock. Such a program is frozen, or it blocks the operation.</li>
-          <li>It doesn't yet recover a card lost <em>while a program is rendering on it</em>. See <a href="#loss">When a card is lost</a>.</li>
+          <li><b>Unexpected loss during active rendering:</b> The GPU is safely powered down and recovered via ZSS power down mechanisms. If the GPU loses power or disconnects unexpectedly while actively rendering, the kernel and background processes remain intact, though the display manager may hang. See <a href="#loss">When a card is lost unexpectedly</a>.</li>
         </ul>
       </div>
     </div>
@@ -851,14 +863,14 @@ zssctl reclaim 0000:01:00.0 --stay   <span class="c"># the same, leaving program
 
   <section class="section" id="loss">
     <div class="wrap">
-      <div><p class="kicker">Use</p><h2>When a card is lost</h2><p class="sub">The case ZSS exists for, and the one least finished.</p></div>
+      <div><p class="kicker">Use</p><h2>When a card is lost unexpectedly</h2><p class="sub">Kernel and background processes stay intact; graceful power-down vs surprise power cuts.</p></div>
       <div class="prose">
         <div class="pre" aria-label="Before you start">
           <div><h4>Needs</h4><ul><li>ZSS_Interceptor loaded, to notice the loss within a tenth of a second.</li><li>The patched NVIDIA driver, for it to be frozen before it finds out. Other drivers need PCI error handlers.</li></ul></div>
-          <div><h4>Assumes</h4><ul><li>The card was idle when it went. That is the only case recovered without a reboot.</li><li><code>loss_while_busy</code> is left at <code>leave</code> unless you know you want otherwise.</li></ul></div>
-          <div class="warn"><h4>Watch out</h4><ul><li>If a program was rendering on the card when it went, the card needs a reboot. The desktop keeps running, so save your work and reboot.</li><li><code>loss_while_busy = freeze</code> stops the display server until the card is back. Don't set it on a machine you use.</li><li>Don't run <code>zssctl on</code> repeatedly while it refuses: it is refusing because resuming the driver under stuck programs hung the machine in testing.</li></ul></div>
+          <div><h4>Assumes</h4><ul><li>The card was idle when it went. That case is recovered cleanly without a reboot.</li><li><code>loss_while_busy</code> is left at <code>leave</code> unless you know you want otherwise.</li></ul></div>
+          <div class="warn"><h4>Watch out</h4><ul><li>If a GPU loses power or disconnects unexpectedly while actively rendering, the kernel and background processes stay intact, but the display manager may hang. Use the ZSS GPU Power Down system for clean recovery.</li><li><code>loss_while_busy = freeze</code> stops the display server until the card is back. Don't set it on a machine you use.</li><li>Don't run <code>zssctl on</code> repeatedly while it refuses: it is refusing because resuming the driver under stuck programs hung the machine in testing.</li></ul></div>
         </div>
-        <p>A card that stops answering, or leaves the bus, is noticed by ZSS_Interceptor within about a tenth of a second. It is marked disconnected, and its driver is told through the kernel's PCI error-recovery handlers if it has them, or frozen if it is the patched NVIDIA driver. What follows depends on whether the card was in use. Here is what happened in four real power cuts on the reference laptop:</p>
+        <p>A card that stops answering, or leaves the bus unexpectedly, is noticed by ZSS_Interceptor within about a tenth of a second. It is marked disconnected, and its driver is told through the kernel's PCI error-recovery handlers if it has them, or frozen if it is the patched NVIDIA driver. The kernel and background system processes remain fully intact. When powering down cleanly via the ZSS GPU Power Down system, the card is always recovered without issue. If the card unexpectedly loses power or disconnects while something was actively rendering, the display manager may hang. Here is what happened in real power cuts on the reference laptop:</p>
         <div class="table-scroll"><table>
           <thead><tr><th scope="col">The card was</th><th scope="col">The desktop</th><th scope="col">Programs on the card</th><th scope="col">Getting the card back</th></tr></thead>
           <tbody>
@@ -1198,7 +1210,7 @@ zss-nvidia-patch remove     <span class="c"># put the stock driver back</span></
             <tr><td class="k"><code>hide_while_off</code></td><td><code>auto</code> (device nodes and the vendor's files), <code>no</code>, or a comma-separated list of extra paths to hide.</td><td><code>auto</code></td></tr>
             <tr><td class="k"><code>default_target</code></td><td>Where programs go when the card goes off: a PCI address or <code>software</code>.</td><td>Unset: the daemon picks</td></tr>
             <tr><td class="k"><code>allow_software</code></td><td>Let programs fall back to the CPU renderer when no GPU suits them.</td><td><code>no</code></td></tr>
-            <tr><td class="k"><code>loss_while_busy</code></td><td><code>leave</code>, <code>refuse</code> or <code>freeze</code>; see <a href="#loss">When a card is lost</a>.</td><td><code>leave</code></td></tr>
+            <tr><td class="k"><code>loss_while_busy</code></td><td><code>leave</code>, <code>refuse</code> or <code>freeze</code>; see <a href="#loss">When a card is lost unexpectedly</a>.</td><td><code>leave</code></td></tr>
             <tr><td class="k"><code>group</code></td><td>Members of this group may switch cards off and on.</td><td><code>zss</code></td></tr>
           </tbody>
         </table></div>
@@ -1413,7 +1425,104 @@ zss-nvidia-patch status         <span class="c"># the driver patch</span></code>
   window.addEventListener('scroll', function () {
     if (!ticking) { ticking = true; requestAnimationFrame(spy); }
   }, { passive: true });
-  spy();
+  // Search implementation
+  var qInput = document.getElementById('q');
+  var resultsList = document.getElementById('results');
+  if (qInput && resultsList) {
+    var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+    var searchIndex = sections.map(function (sec) {
+      var id = sec.getAttribute('id');
+      var h2 = sec.querySelector('h2');
+      var title = h2 ? h2.textContent.trim() : id;
+      var kicker = sec.querySelector('.kicker');
+      var kickerText = kicker ? kicker.textContent.trim() : 'Wiki';
+      var prose = sec.querySelector('.prose');
+      var bodyText = (prose ? prose.textContent : sec.textContent).replace(/\s+/g, ' ').trim();
+      return { id: id, title: title, kicker: kickerText, text: bodyText };
+    });
+
+    function doSearch() {
+      var query = qInput.value.trim().toLowerCase();
+      if (!query) {
+        resultsList.innerHTML = '';
+        resultsList.hidden = true;
+        nav.classList.remove('searching');
+        return;
+      }
+      var matches = [];
+      searchIndex.forEach(function (item) {
+        var inTitle = item.title.toLowerCase().indexOf(query);
+        var inText = item.text.toLowerCase().indexOf(query);
+        if (inTitle !== -1 || inText !== -1) {
+          var snip = '';
+          if (inText !== -1) {
+            var start = Math.max(0, inText - 35);
+            var end = Math.min(item.text.length, inText + query.length + 55);
+            snip = (start > 0 ? '…' : '') + item.text.slice(start, end) + (end < item.text.length ? '…' : '');
+          } else {
+            snip = item.text.slice(0, 80) + '…';
+          }
+          matches.push({ id: item.id, title: item.title, kicker: item.kicker, snip: snip });
+        }
+      });
+
+      if (matches.length === 0) {
+        resultsList.innerHTML = '<li class="none">No matching sections found</li>';
+        resultsList.hidden = false;
+        nav.classList.add('searching');
+        return;
+      }
+
+      var html = '';
+      matches.slice(0, 8).forEach(function (m, idx) {
+        html += '<li><a href="#' + m.id + '"' + (idx === 0 ? ' class="first"' : '') + '>' +
+                '<span class="r-title">' + m.title + '</span>' +
+                '<span class="r-where">' + m.kicker + '</span>' +
+                '<span class="r-snip">' + m.snip + '</span></a></li>';
+      });
+      resultsList.innerHTML = html;
+      resultsList.hidden = false;
+      nav.classList.add('searching');
+    }
+
+    qInput.addEventListener('input', doSearch);
+    qInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        qInput.value = '';
+        doSearch();
+        qInput.blur();
+      } else if (e.key === 'Enter') {
+        var first = resultsList.querySelector('a');
+        if (first) {
+          first.click();
+          resultsList.hidden = true;
+          nav.classList.remove('searching');
+        }
+      }
+    });
+
+    resultsList.addEventListener('click', function (e) {
+      var link = e.target.closest('a');
+      if (link) {
+        var hash = link.getAttribute('href');
+        var targetEl = hash ? document.querySelector(hash) : null;
+        resultsList.hidden = true;
+        nav.classList.remove('searching');
+        qInput.value = '';
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    });
+
+    window.addEventListener('keydown', function (e) {
+      if (e.key === '/' && document.activeElement !== qInput && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        qInput.focus();
+        qInput.select();
+      }
+    });
+  }
 })();
 </script>
 </body>
