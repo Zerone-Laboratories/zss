@@ -179,6 +179,7 @@
   .platforms { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); border: 1px solid var(--line); border-top: 0; background: var(--panel); }
   .platforms li { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; padding: 0.55rem 0.25rem; border-right: 1px solid var(--line); font-size: 0.75rem; color: var(--mute); text-align: center; line-height: 1.2; }
   .platforms li:last-child { border-right: 0; }
+  .platforms svg.wide { width: 64px; height: 22px; }
   .platforms svg { width: 22px; height: 22px; fill: currentColor; color: var(--ink); }
   .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1.5rem; }
   .tag { display: inline-block; border: 1px solid var(--line); padding: 0.15rem 0.6rem; font-size: 0.875rem; }
@@ -333,6 +334,7 @@
     .platforms li:nth-child(3) { border-right: 0; }
     .platforms li:nth-child(4), .platforms li:nth-child(5) { border-top: 1px solid var(--line); }
     .platforms li:last-child { border-right: 0; }
+  .platforms svg.wide { width: 64px; height: 22px; }
     .actions { flex-direction: column; }
     .actions .btn { width: 100%; text-align: center; }
   }
@@ -417,14 +419,13 @@
     <div class="wrap">
       <div>
         <p class="lead" id="hero-title">ZrnSelectiveSuspend (ZSS) takes a graphics card out of service on a live Linux desktop. The programs drawing on it move to another GPU while they draw. The card is then powered off, or lent to a virtual machine. When it returns, everything moves back. No reboot, no log-out.</p>
-        <p>Built for any GPU and any driver; proven on one laptop so far. <a href="#hardware">Will it work here?</a> says which parts work anywhere.</p>
         <div class="actions">
           <a class="btn" href="#install">Install</a>
           <a class="btn ghost" href="#architecture">How it works</a>
           <a class="btn ghost" href="#testing">Help test it</a>
         </div>
         <div class="alpha-note" role="note">
-          <p><b>Alpha.</b> Proven on one laptop, on X11. Support for more GPUs, drivers, distributions and Wayland will be added in future releases.</p>
+          <p><b>Alpha.</b> Built for any GPU and driver, proven so far on one laptop, on X11. Support for more GPUs, drivers, distributions and Wayland will come in future releases. <a href="#hardware">Will it work here?</a> says which parts work anywhere today.</p>
           <dl class="versions" aria-label="Supported versions today">
             <div><dt>Vulkan</dt><dd><b>1.1</b><span>Programs that need 1.2 or later don't start under ZSS yet</span></dd></div>
             <div><dt>OpenGL</dt><dd><b>3.2 · ES 3.1</b><span>Through Mesa's Zink, on the tested pair of GPUs</span></dd></div>
@@ -432,12 +433,12 @@
           </dl>
         </div>
         <ul class="features" aria-label="Features">
-          <li>Moves running Vulkan and OpenGL programs to another GPU while they draw: the program and the X session keep running, nothing restarts</li>
-          <li>Switches the discrete GPU fully off (0 W) under a live X session and back on, without logging out or closing anything</li>
-          <li>Hands the GPU to a virtual machine through <code>vfio-pci</code> and takes it back, with no reboot and no restart of X</li>
-          <li>Brings back a GPU that lost power without warning while idle, driver included, without crashing the session or rebooting</li>
-          <li>Chromium, VS Code and Unity games such as IFSCL keep drawing while they move</li>
-          <li>Switches the GPU off when the charger is pulled and on when it returns, moving programs both ways</li>
+          <li><span>Moves running Vulkan and OpenGL programs between GPUs mid-draw</span></li>
+          <li><span>Powers the discrete GPU off and on without crashing the X session</span></li>
+          <li><span>Lends the GPU to a virtual machine with no reboot, and takes it back</span></li>
+          <li><span>Recovers a GPU that lost power while idle, without a reboot</span></li>
+          <li><span>Chromium, VS Code and Unity games keep drawing while they move</span></li>
+          <li><span>Switches off on battery and back on at the charger, programs moved</span></li>
         </ul>
       </div>
 
@@ -450,8 +451,8 @@
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.39.605C10.376 3.092 9.764 4.72 8.635 7.132c.693.734 1.543 1.589 2.923 2.554-1.484-.61-2.496-1.224-3.252-1.86C6.86 10.842 4.596 15.138 0 23.395c3.612-2.085 6.412-3.37 9.021-3.862a6.61 6.61 0 01-.171-1.547l.003-.115c.058-2.315 1.261-4.095 2.687-3.973 1.426.12 2.534 2.096 2.478 4.409a6.52 6.52 0 01-.146 1.243c2.58.505 5.352 1.787 8.914 3.844-.702-1.293-1.33-2.459-1.929-3.57-.943-.73-1.926-1.682-3.933-2.713 1.38.359 2.367.772 3.137 1.234-6.09-11.334-6.582-12.84-8.67-17.74zM22.898 21.36v-.623h-.234v-.084h.562v.084h-.234v.623h.331v-.707h.142l.167.5.034.107a2.26 2.26 0 01.038-.114l.17-.493H24v.707h-.091v-.593l-.206.593h-.084l-.205-.602v.602h-.091"/></svg><span>Arch Linux</span></li>
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.94 1.9l-9.092 11.874 4.598 6.392a14.29 14.29 0 0 1-2.56.228c-2.387 0-4.582-.577-6.316-1.542l6.556-8.627-6.031-8.311L2.23 1.91 9.8 12.48l-4.332 5.66c-1.692-1.266-2.729-2.965-2.729-4.832 0-2.13 1.348-4.042 3.48-5.342l-.655-.999C2.22 8.386 0 10.876 0 13.71c0 2.432 1.635 4.61 4.212 6.075l-1.765 2.307h1.661l1.299-1.709c1.892.83 4.158 1.314 6.592 1.314a17.43 17.43 0 0 0 4.188-.501l.65.903h4.865l-1.729-2.422C22.443 18.214 24 16.082 24 13.71c0-2.94-2.39-5.512-5.948-6.9l-.217.311c3.099 1.214 5.195 3.531 5.195 6.188 0 2.202-1.44 4.17-3.698 5.47l-5.153-7.22 7.382-9.658zM12 5.755c-.586 0-1.212.046-1.775.1 1.004 1.309 1.836 2.417 2.795 3.676-.538-1.157-1.644-2.268-1.261-2.839.378-.565 1.075-.47 1.128-.47 1.118 0 2.194.127 3.2.36l.235-.324C14.98 5.91 13.523 5.754 12 5.754z"/></svg><span>X11 (Xorg)</span></li>
           <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z"/></svg><span>NVIDIA 470</span></li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.411 15.12h-.875v-2.798c.28.156.649.442.875.719zm-7.383 0H4.936l-1.423-4.4h.992l.979 3.093h.013l.992-3.093h.999zm4.394 0h-.833v-.444h-.017c-.112.185-.255.319-.432.401s-.358.123-.541.123q-.3525 0-.576-.093c-.151-.063-.267-.149-.354-.261-.086-.112-.146-.25-.181-.412-.034-.162-.052-.343-.052-.539v-1.961h.876v1.799c0 .263.041.459.123.589.082.129.229.194.438.194.237 0 .41-.071.518-.214.107-.142.159-.375.159-.699v-1.669h.876zm3.134-1.918-.002-.123 1.104-1.147h1.035l-1.201 1.171 1.337 2.017h-1.061zm2.433-.289c.013-.205.065-.375.155-.511.091-.136.205-.244.345-.326.141-.082.298-.14.473-.174.174-.035.349-.052.526-.052.16 0 .324.011.487.034.164.024.315.067.451.132.136.067.246.157.332.274.087.116.13.272.13.466v1.659c0 .144.009.282.024.412.017.131.045.23.086.295h-.889c-.017-.05-.03-.099-.041-.151a1.2 1.2 0 0 1-.021-.157c-.141.144-.304.243-.494.302-.19.058-.382.086-.581.086-.151 0-.293-.02-.424-.056a.99.99 0 0 1-.346-.173c-.099-.077-.176-.177-.23-.295-.056-.119-.085-.261-.085-.425 0-.181.033-.33.095-.447.065-.116.147-.211.246-.28.102-.069.216-.123.345-.158.13-.034.259-.062.391-.084.131-.019.261-.036.388-.049s.24-.031.339-.056c.099-.024.177-.061.235-.108.058-.048.084-.117.08-.207 0-.095-.015-.171-.048-.225a.32.32 0 0 0-.123-.129.51.51 0 0 0-.179-.063c-.069-.01-.14-.015-.218-.015-.172 0-.308.037-.407.11-.1.074-.156.197-.173.369zm2.021.647c-.037.033-.084.059-.138.078a1.04 1.04 0 0 1-.179.045c-.065.013-.13.022-.201.031-.069.008-.14.019-.209.03a1.7 1.7 0 0 0-.194.049c-.065.022-.119.048-.166.084a.39.39 0 0 0-.114.132c-.029.054-.044.121-.044.203 0 .077.015.144.044.196.028.054.069.095.116.127.05.031.108.052.173.065.064.013.133.019.202.019.173 0 .307-.028.402-.086.094-.058.163-.127.209-.207.045-.08.073-.162.082-.244.011-.082.015-.148.015-.196zm1.443-1.628h.833v.444h.017c.11-.185.254-.319.431-.403s.358-.127.542-.127c.235 0 .427.032.576.094.148.065.267.154.353.266.087.112.147.25.182.412.034.162.051.343.051.539v1.961h-.875v-1.799c0-.263-.041-.46-.123-.589-.082-.13-.229-.194-.438-.194-.24 0-.41.071-.518.213-.108.143-.16.376-.16.699v1.67h-.875zm-8.451-.55c.302.149.593.31.876.483v3.253h-.876zm-8.93.159c-.261.768.203 1.635 1.156 2.408-2.122-.911-3.496-2.244-3.184-3.38.434-1.573 3.932-2.177 7.481-1.491 3.136.606 5.416 2.375 5.884 3.617-1.035-.936-2.621-1.883-4.562-2.37-3.235-.816-6.268-.27-6.775 1.216m11.341.613c-.207-.328-.502-.667-.875-1.001v-.436h.875zM24 14.652c0 .265-.207.472-.479.472-.267 0-.481-.207-.481-.472 0-.259.214-.466.481-.466.27 0 .479.207.479.466m-.839 0c0 .207.153.373.364.373.205 0 .356-.164.356-.369 0-.207-.151-.375-.358-.375-.209 0-.362.166-.362.371m.287.246h-.108v-.466c.043-.009.103-.015.179-.015.088 0 .127.015.162.034.026.02.045.056.045.104 0 .052-.039.09-.097.108v.006c.045.017.071.052.086.114.015.072.024.1.035.117h-.117c-.015-.017-.023-.061-.036-.114-.009-.052-.037-.074-.097-.074h-.052zm.002-.266h.052c.06 0 .108-.019.108-.069 0-.043-.031-.071-.1-.071-.028 0-.047.002-.06.007z"/></svg><span>Vulkan 1.1</span></li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.607 13.88c1.32 1.197 3.862 2.008 6.781 2.008 2.375 0 4.503-.481 5.923-1.325-1.555 1.413-4.328 2.41-7.495 2.41C3.947 16.972 0 14.745 0 11.999c0-2.747 3.948-4.973 8.818-4.972 3.179.001 5.96 1.001 7.511 2.425-1.421-.85-3.558-1.34-5.941-1.34-2.828 0-5.303.761-6.655 1.897.01-.004.019-.008.028-.013.253-.119.548-.179.885-.179.336 0 .631.06.885.179.253.12.465.28.635.48.171.201.298.431.383.691.086.26.128.531.128.812 0 .282-.042.553-.128.813-.085.26-.212.49-.383.691-.17.2-.382.359-.635.477-.254.117-.549.176-.885.176-.337 0-.632-.059-.885-.176a2.2 2.2 0 0 1-.154-.08m-.347-1.283c.056.203.143.385.262.547s.271.292.458.391q.279.147.666.147t.666-.147c.186-.099.339-.229.458-.391s.206-.344.261-.547a2.3 2.3 0 0 0 0-1.232c-.055-.203-.142-.385-.261-.547s-.272-.293-.458-.391-.408-.148-.666-.148-.48.05-.666.148c-.187.099-.339.229-.458.391s-.206.344-.262.547c-.055.202-.083.407-.083.616 0 .208.028.414.083.616m4.254-1.183v.356h.009c.073-.146.187-.252.344-.318.156-.066.328-.099.515-.099.208 0 .39.037.544.112.155.074.283.175.385.302.103.128.18.274.232.441.052.166.078.342.078.529s-.025.363-.075.529c-.051.167-.127.312-.229.435-.103.124-.231.222-.386.293-.154.071-.334.107-.539.107-.066 0-.139-.007-.221-.02a1.25 1.25 0 0 1-.242-.067.94.94 0 0 1-.227-.125.67.67 0 0 1-.179-.196h-.009v1.359h-.446v-3.638zm1.585.936c-.033-.117-.083-.222-.151-.313-.067-.092-.154-.165-.26-.219-.105-.054-.229-.081-.371-.081-.149 0-.275.028-.379.086a.76.76 0 0 0-.255.226c-.066.094-.113.2-.143.318-.029.119-.044.24-.044.362 0 .129.016.253.047.373.031.121.08.227.148.319.067.091.155.165.262.221q.162.084.39.084c.152 0 .28-.029.382-.087a.694.694 0 0 0 .246-.229c.063-.095.108-.203.135-.325.028-.122.042-.248.042-.377 0-.122-.016-.241-.049-.358m2.799 1.527c-.201.149-.455.224-.761.224q-.324 0-.561-.102c-.159-.068-.292-.163-.4-.285-.107-.122-.188-.268-.242-.438-.054-.169-.084-.354-.091-.554 0-.2.031-.384.094-.55.062-.166.15-.311.263-.433s.248-.217.402-.285c.155-.067.325-.101.51-.101.24 0 .439.048.598.145.158.097.285.22.381.37q.144.2235.198.489c.037.177.052.345.045.505h-2.018c-.004.115.01.224.041.328.032.103.082.195.151.274.07.08.158.143.266.191.108.047.234.071.38.071.187 0 .341-.043.461-.128q.1785-.1275.237-.387h.438c-.059.295-.19.517-.392.666m-.108-1.688c-.04-.092-.093-.171-.161-.237a.77.77 0 0 0-.239-.157c-.092-.039-.194-.059-.304-.059-.115 0-.218.02-.31.059a.71.71 0 0 0-.237.16.8.8 0 0 0-.156.236c-.038.09-.06.186-.067.287h1.545a.86.86 0 0 0-.071-.289m1.259-.775v.418h.009c.185-.32.478-.479.88-.479.178 0 .326.023.445.071s.215.114.288.199c.074.085.125.186.155.303.029.117.044.247.044.39v1.733h-.446v-1.783q0-.2445-.147-.387c-.097-.095-.231-.143-.402-.143-.136 0-.253.021-.353.062-.099.04-.182.098-.248.173a.75.75 0 0 0-.149.262c-.033.1-.049.21-.049.328v1.487h-.447v-2.634zm4.908 2.606c-.202.083-.406.125-.611.125-.324 0-.616-.056-.875-.166s-.477-.262-.655-.456c-.178-.193-.314-.42-.409-.682-.095-.261-.142-.542-.142-.844 0-.31.047-.597.142-.862.094-.265.23-.496.408-.694.177-.197.395-.352.654-.464.259-.113.55-.169.875-.169.217 0 .427.032.631.096.203.064.387.158.551.282.164.125.3.277.406.459.107.182.172.391.196.626h-.889c-.055-.231-.162-.405-.32-.521-.159-.116-.35-.174-.575-.174-.21 0-.388.04-.534.119s-.265.186-.356.319q-.1365.201-.198.456-.063.255-.063.528c0 .174.021.344.063.508.041.165.108.313.199.444.091.132.209.237.356.316.146.08.324.119.534.119.309 0 .547-.076.715-.228.169-.152.267-.372.294-.661h-.936v-.681h1.776v2.237h-.591l-.095-.47c-.166.209-.35.355-.551.438m2.746-4.107v3.368h2.063v.768h-2.992V9.913zM24 13.667c0 .07-.017.134-.052.194a.389.389 0 0 1-.336.194.389.389 0 0 1-.336-.194.39.39 0 0 1-.052-.194.389.389 0 0 1 .194-.336.39.39 0 0 1 .194-.052.389.389 0 0 1 .336.194c.035.06.052.125.052.194m-.075 0c0-.086-.031-.16-.092-.221a.302.302 0 0 0-.221-.092c-.086 0-.16.031-.221.092a.302.302 0 0 0-.092.221c0 .086.031.16.092.221s.135.092.221.092.16-.031.221-.092a.302.302 0 0 0 .092-.221m-.489-.207h.186c.052 0 .09.01.114.032.023.021.035.049.035.085q0 .0405-.027.072c-.018.02-.046.035-.085.044.016.006.028.013.035.019q.0165.015.033.042c.001.002.023.042.067.12h-.122c-.039-.079-.066-.126-.079-.141-.014-.016-.028-.023-.041-.023-.003 0-.007 0-.013.001v.163h-.103zm.103.176h.045q.045 0 .063-.015a.046.046 0 0 0 .018-.037.05.05 0 0 0-.017-.038c-.012-.009-.032-.014-.06-.014h-.049z"/></svg><span>OpenGL 3.2</span></li>
+          <li><svg class="wide" viewBox="0 8.3 24 7.4" aria-hidden="true"><path d="M13.411 15.12h-.875v-2.798c.28.156.649.442.875.719zm-7.383 0H4.936l-1.423-4.4h.992l.979 3.093h.013l.992-3.093h.999zm4.394 0h-.833v-.444h-.017c-.112.185-.255.319-.432.401s-.358.123-.541.123q-.3525 0-.576-.093c-.151-.063-.267-.149-.354-.261-.086-.112-.146-.25-.181-.412-.034-.162-.052-.343-.052-.539v-1.961h.876v1.799c0 .263.041.459.123.589.082.129.229.194.438.194.237 0 .41-.071.518-.214.107-.142.159-.375.159-.699v-1.669h.876zm3.134-1.918-.002-.123 1.104-1.147h1.035l-1.201 1.171 1.337 2.017h-1.061zm2.433-.289c.013-.205.065-.375.155-.511.091-.136.205-.244.345-.326.141-.082.298-.14.473-.174.174-.035.349-.052.526-.052.16 0 .324.011.487.034.164.024.315.067.451.132.136.067.246.157.332.274.087.116.13.272.13.466v1.659c0 .144.009.282.024.412.017.131.045.23.086.295h-.889c-.017-.05-.03-.099-.041-.151a1.2 1.2 0 0 1-.021-.157c-.141.144-.304.243-.494.302-.19.058-.382.086-.581.086-.151 0-.293-.02-.424-.056a.99.99 0 0 1-.346-.173c-.099-.077-.176-.177-.23-.295-.056-.119-.085-.261-.085-.425 0-.181.033-.33.095-.447.065-.116.147-.211.246-.28.102-.069.216-.123.345-.158.13-.034.259-.062.391-.084.131-.019.261-.036.388-.049s.24-.031.339-.056c.099-.024.177-.061.235-.108.058-.048.084-.117.08-.207 0-.095-.015-.171-.048-.225a.32.32 0 0 0-.123-.129.51.51 0 0 0-.179-.063c-.069-.01-.14-.015-.218-.015-.172 0-.308.037-.407.11-.1.074-.156.197-.173.369zm2.021.647c-.037.033-.084.059-.138.078a1.04 1.04 0 0 1-.179.045c-.065.013-.13.022-.201.031-.069.008-.14.019-.209.03a1.7 1.7 0 0 0-.194.049c-.065.022-.119.048-.166.084a.39.39 0 0 0-.114.132c-.029.054-.044.121-.044.203 0 .077.015.144.044.196.028.054.069.095.116.127.05.031.108.052.173.065.064.013.133.019.202.019.173 0 .307-.028.402-.086.094-.058.163-.127.209-.207.045-.08.073-.162.082-.244.011-.082.015-.148.015-.196zm1.443-1.628h.833v.444h.017c.11-.185.254-.319.431-.403s.358-.127.542-.127c.235 0 .427.032.576.094.148.065.267.154.353.266.087.112.147.25.182.412.034.162.051.343.051.539v1.961h-.875v-1.799c0-.263-.041-.46-.123-.589-.082-.13-.229-.194-.438-.194-.24 0-.41.071-.518.213-.108.143-.16.376-.16.699v1.67h-.875zm-8.451-.55c.302.149.593.31.876.483v3.253h-.876zm-8.93.159c-.261.768.203 1.635 1.156 2.408-2.122-.911-3.496-2.244-3.184-3.38.434-1.573 3.932-2.177 7.481-1.491 3.136.606 5.416 2.375 5.884 3.617-1.035-.936-2.621-1.883-4.562-2.37-3.235-.816-6.268-.27-6.775 1.216m11.341.613c-.207-.328-.502-.667-.875-1.001v-.436h.875zM24 14.652c0 .265-.207.472-.479.472-.267 0-.481-.207-.481-.472 0-.259.214-.466.481-.466.27 0 .479.207.479.466m-.839 0c0 .207.153.373.364.373.205 0 .356-.164.356-.369 0-.207-.151-.375-.358-.375-.209 0-.362.166-.362.371m.287.246h-.108v-.466c.043-.009.103-.015.179-.015.088 0 .127.015.162.034.026.02.045.056.045.104 0 .052-.039.09-.097.108v.006c.045.017.071.052.086.114.015.072.024.1.035.117h-.117c-.015-.017-.023-.061-.036-.114-.009-.052-.037-.074-.097-.074h-.052zm.002-.266h.052c.06 0 .108-.019.108-.069 0-.043-.031-.071-.1-.071-.028 0-.047.002-.06.007z"/></svg><span>Vulkan 1.1</span></li>
+          <li><svg class="wide" viewBox="0 6.6 24 10.8" aria-hidden="true"><path d="M3.607 13.88c1.32 1.197 3.862 2.008 6.781 2.008 2.375 0 4.503-.481 5.923-1.325-1.555 1.413-4.328 2.41-7.495 2.41C3.947 16.972 0 14.745 0 11.999c0-2.747 3.948-4.973 8.818-4.972 3.179.001 5.96 1.001 7.511 2.425-1.421-.85-3.558-1.34-5.941-1.34-2.828 0-5.303.761-6.655 1.897.01-.004.019-.008.028-.013.253-.119.548-.179.885-.179.336 0 .631.06.885.179.253.12.465.28.635.48.171.201.298.431.383.691.086.26.128.531.128.812 0 .282-.042.553-.128.813-.085.26-.212.49-.383.691-.17.2-.382.359-.635.477-.254.117-.549.176-.885.176-.337 0-.632-.059-.885-.176a2.2 2.2 0 0 1-.154-.08m-.347-1.283c.056.203.143.385.262.547s.271.292.458.391q.279.147.666.147t.666-.147c.186-.099.339-.229.458-.391s.206-.344.261-.547a2.3 2.3 0 0 0 0-1.232c-.055-.203-.142-.385-.261-.547s-.272-.293-.458-.391-.408-.148-.666-.148-.48.05-.666.148c-.187.099-.339.229-.458.391s-.206.344-.262.547c-.055.202-.083.407-.083.616 0 .208.028.414.083.616m4.254-1.183v.356h.009c.073-.146.187-.252.344-.318.156-.066.328-.099.515-.099.208 0 .39.037.544.112.155.074.283.175.385.302.103.128.18.274.232.441.052.166.078.342.078.529s-.025.363-.075.529c-.051.167-.127.312-.229.435-.103.124-.231.222-.386.293-.154.071-.334.107-.539.107-.066 0-.139-.007-.221-.02a1.25 1.25 0 0 1-.242-.067.94.94 0 0 1-.227-.125.67.67 0 0 1-.179-.196h-.009v1.359h-.446v-3.638zm1.585.936c-.033-.117-.083-.222-.151-.313-.067-.092-.154-.165-.26-.219-.105-.054-.229-.081-.371-.081-.149 0-.275.028-.379.086a.76.76 0 0 0-.255.226c-.066.094-.113.2-.143.318-.029.119-.044.24-.044.362 0 .129.016.253.047.373.031.121.08.227.148.319.067.091.155.165.262.221q.162.084.39.084c.152 0 .28-.029.382-.087a.694.694 0 0 0 .246-.229c.063-.095.108-.203.135-.325.028-.122.042-.248.042-.377 0-.122-.016-.241-.049-.358m2.799 1.527c-.201.149-.455.224-.761.224q-.324 0-.561-.102c-.159-.068-.292-.163-.4-.285-.107-.122-.188-.268-.242-.438-.054-.169-.084-.354-.091-.554 0-.2.031-.384.094-.55.062-.166.15-.311.263-.433s.248-.217.402-.285c.155-.067.325-.101.51-.101.24 0 .439.048.598.145.158.097.285.22.381.37q.144.2235.198.489c.037.177.052.345.045.505h-2.018c-.004.115.01.224.041.328.032.103.082.195.151.274.07.08.158.143.266.191.108.047.234.071.38.071.187 0 .341-.043.461-.128q.1785-.1275.237-.387h.438c-.059.295-.19.517-.392.666m-.108-1.688c-.04-.092-.093-.171-.161-.237a.77.77 0 0 0-.239-.157c-.092-.039-.194-.059-.304-.059-.115 0-.218.02-.31.059a.71.71 0 0 0-.237.16.8.8 0 0 0-.156.236c-.038.09-.06.186-.067.287h1.545a.86.86 0 0 0-.071-.289m1.259-.775v.418h.009c.185-.32.478-.479.88-.479.178 0 .326.023.445.071s.215.114.288.199c.074.085.125.186.155.303.029.117.044.247.044.39v1.733h-.446v-1.783q0-.2445-.147-.387c-.097-.095-.231-.143-.402-.143-.136 0-.253.021-.353.062-.099.04-.182.098-.248.173a.75.75 0 0 0-.149.262c-.033.1-.049.21-.049.328v1.487h-.447v-2.634zm4.908 2.606c-.202.083-.406.125-.611.125-.324 0-.616-.056-.875-.166s-.477-.262-.655-.456c-.178-.193-.314-.42-.409-.682-.095-.261-.142-.542-.142-.844 0-.31.047-.597.142-.862.094-.265.23-.496.408-.694.177-.197.395-.352.654-.464.259-.113.55-.169.875-.169.217 0 .427.032.631.096.203.064.387.158.551.282.164.125.3.277.406.459.107.182.172.391.196.626h-.889c-.055-.231-.162-.405-.32-.521-.159-.116-.35-.174-.575-.174-.21 0-.388.04-.534.119s-.265.186-.356.319q-.1365.201-.198.456-.063.255-.063.528c0 .174.021.344.063.508.041.165.108.313.199.444.091.132.209.237.356.316.146.08.324.119.534.119.309 0 .547-.076.715-.228.169-.152.267-.372.294-.661h-.936v-.681h1.776v2.237h-.591l-.095-.47c-.166.209-.35.355-.551.438m2.746-4.107v3.368h2.063v.768h-2.992V9.913zM24 13.667c0 .07-.017.134-.052.194a.389.389 0 0 1-.336.194.389.389 0 0 1-.336-.194.39.39 0 0 1-.052-.194.389.389 0 0 1 .194-.336.39.39 0 0 1 .194-.052.389.389 0 0 1 .336.194c.035.06.052.125.052.194m-.075 0c0-.086-.031-.16-.092-.221a.302.302 0 0 0-.221-.092c-.086 0-.16.031-.221.092a.302.302 0 0 0-.092.221c0 .086.031.16.092.221s.135.092.221.092.16-.031.221-.092a.302.302 0 0 0 .092-.221m-.489-.207h.186c.052 0 .09.01.114.032.023.021.035.049.035.085q0 .0405-.027.072c-.018.02-.046.035-.085.044.016.006.028.013.035.019q.0165.015.033.042c.001.002.023.042.067.12h-.122c-.039-.079-.066-.126-.079-.141-.014-.016-.028-.023-.041-.023-.003 0-.007 0-.013.001v.163h-.103zm.103.176h.045q.045 0 .063-.015a.046.046 0 0 0 .018-.037.05.05 0 0 0-.017-.038c-.012-.009-.032-.014-.06-.014h-.049z"/></svg><span>OpenGL 3.2</span></li>
         </ul>
         <div class="device-info">
           <dl class="specs" aria-label="Technical specifications">
@@ -483,7 +484,7 @@
       <div><p class="kicker">Start</p><h2>What it does</h2><p class="sub">Three things a running desktop normally can't do with its graphics card.</p></div>
       <div class="prose">
         <div class="cols">
-          <div><h3>Power off</h3><p>Switch the discrete GPU off while X and your programs keep running. The card draws 0 W until you switch it back on, or until the charger is plugged in.</p></div>
+          <div><h3>Power off</h3><p>Switch the discrete GPU off while X and your programs keep running. The card draws 0 W until you switch it back on.</p></div>
           <div><h3>Move</h3><p>Move Vulkan programs, OpenGL programs (through Zink), browsers, Electron apps and Unity games from one GPU to another while they draw, and back again.</p></div>
           <div><h3>Lend</h3><p>Hand the card to a virtual machine through <code>vfio-pci</code> and take it back afterwards. The host's programs are moved away and then returned.</p></div>
         </div>
@@ -502,7 +503,7 @@
           <li>It doesn't start or configure virtual machines. It prepares the host side, and any passthrough setup works after that.</li>
           <li>It never edits your bootloader configuration. Switching the IOMMU on, if you want lending, is your step.</li>
           <li>It can't move a program that wasn't started under ZSS_AirLock. Such a program is frozen, or it blocks the operation.</li>
-          <li><b>Unexpected loss during active rendering:</b> The GPU is safely powered down and recovered via ZSS power down mechanisms. If the GPU loses power or disconnects unexpectedly while actively rendering, the kernel and background processes remain intact, though the display manager may hang. See <a href="#loss">When a card is lost unexpectedly</a>.</li>
+          <li>It can't yet recover a card that loses power <em>while a program is rendering on it</em>. The kernel and background processes survive, but the display server may hang and the card needs a reboot. A card you switch off with <code>zssctl off</code> is never in that state. See <a href="#loss">When a card is lost unexpectedly</a>.</li>
         </ul>
       </div>
     </div>
@@ -564,7 +565,7 @@
             <tr><td class="k">Lending rule (optional)</td><td><code>/etc/udev/rules.d/72-zss-lend-seat.rules</code></td></tr>
           </tbody>
         </table></div>
-        <p>The initial ramdisk is regenerated only if the GPU driver is part of it, and the installer says so first. If no GPU could be detected for <code>/etc/zss/zssd.conf</code>, the installer says so: set <code>gpu =</code> there and run <code>sudo systemctl enable --now zssd</code>.</p>
+        <p>If no GPU could be detected for <code>/etc/zss/zssd.conf</code>, the installer says so: set <code>gpu =</code> there and run <code>sudo systemctl enable --now zssd</code>.</p>
 
         <h3 id="after">After installing</h3>
         <pre><code>zssctl status                  <span class="c"># the managed GPU, its state, wake support, who is using it</span>
@@ -634,7 +635,7 @@ zss-nvidia-patch remove                                <span class="c"># if you 
         <div class="pre" aria-label="Before you start">
           <div><h4>Needs</h4><ul><li><code>zssd</code> running: <code>zssctl status</code> answers.</li><li>A program that needs Vulkan 1.1 or less, or OpenGL 3.2 or less (with <code>--gl</code>).</li><li>A Vulkan driver for every GPU it may move to (Mesa for Intel and AMD).</li></ul></div>
           <div><h4>Assumes</h4><ul><li>The program is started by <code>zss-run</code> or the launch router. A program that is already running can't be taken over.</li><li>The other GPU has enough free memory for the program's textures and buffers.</li><li>The session is X11, so that frames drawn on one GPU can be shown by the other.</li></ul></div>
-          <div class="warn"><h4>Watch out</h4><ul><li>A program that uses the GPU but wasn't started under ZSS can't be moved: switching the card off freezes it.</li><li>Programs started before the daemon was restarted aren't known to it. Restart them before relying on a move.</li><li>Games run through Proton or DXVK need Vulkan 1.3 and won't start under <code>zss-run</code>.</li></ul></div>
+          <div class="warn"><h4>Watch out</h4><ul><li>A program that uses the GPU but wasn't started under ZSS can't be moved: switching the card off freezes it.</li><li>Programs started before the daemon was restarted aren't known to it. Restart them before relying on a move.</li></ul></div>
         </div>
         <p>ZSS_AirLock is a Vulkan driver that sits in front of the real ones. A program has to be started under it to be movable. <code>zss-run</code> does that, and starts the program on the dedicated GPU.</p>
         <pre><code>zss-run vkcube                     <span class="c"># a Vulkan program, on the dedicated GPU</span>
@@ -729,9 +730,7 @@ zssctl on 0000:01:00.0 --stay <span class="c"># power on, leave the programs whe
         <h3 id="frozen">Programs that can't be moved</h3>
         <p>A program that uses the card but wasn't started under ZSS_AirLock (a monitor such as <code>btop</code>, say) can't be moved. <code>zssctl off</code> freezes it and <code>zssctl on</code> lets it carry on; the report names it.</p>
         <ul>
-          <li>The terminal you type <code>zssctl off</code> into is never frozen. If it uses the card, the command says so and stops.</li>
-          <li>PID 1, the login manager and the rest of the system are never frozen.</li>
-          <li>If a frozen program is one you need to get back (a window manager), switch to another virtual terminal and run <code>zssctl on</code> there.</li>
+          <li>Never frozen: PID 1, <code>systemd-logind</code>, <code>elogind</code>, <code>seatd</code>, the recognised display servers, and the terminal running <code>zssctl off</code>. Your login manager is <em>not</em> on that list.</li>
           <li><code>zssctl off --console</code> shows the report on a text console and keeps the screen there while the card is off. Press a key to power it on.</li>
         </ul>
 
@@ -757,7 +756,7 @@ zssctl detach 0000:01:00.0 --to software    <span class="c"># ... to the CPU ren
 zssctl attach 0000:01:00.0                  <span class="c"># bring back every program that started there</span>
 zssctl resume PID                           <span class="c"># resume a parked program on a suitable GPU</span>
 zssctl monitor                              <span class="c"># follow the daemon's events</span></code></pre>
-        <p>A program that can't go anywhere suitable is <b>parked</b>: it waits, with its state kept, until <code>zssctl resume</code> or until its GPU comes back. A program is only resumed on the CPU renderer if <code>allow_software = yes</code>.</p>
+        <p>A parked program keeps its state while it waits. It is only resumed on the CPU renderer if <code>allow_software = yes</code>.</p>
         <h3>Trying it without the service</h3>
         <p>A private daemon with the <code>dry-run</code> backend really moves programs between GPUs but never touches the card's power or driver. This is how the moving tests run.</p>
         <pre><code><span class="c"># terminal 1</span>
@@ -809,18 +808,7 @@ zssctl status                        <span class="c"># state=lent, and the proce
 zssctl reclaim 0000:01:00.0          <span class="c"># power cycle, host driver back, programs returned</span>
 zssctl reclaim 0000:01:00.0 --stay   <span class="c"># the same, leaving programs where they are</span></code></pre>
 
-        <h3 id="lend-needs">What a machine needs</h3>
-        <div class="table-scroll"><table>
-          <thead><tr><th scope="col">Requirement</th><th scope="col">How to check</th></tr></thead>
-          <tbody>
-            <tr><td>An IOMMU, switched on (<code>intel_iommu=on</code> or <code>amd_iommu=on</code> on the kernel command line)</td><td><code>ls /sys/kernel/iommu_groups</code> isn't empty</td></tr>
-            <tr><td>The card alone in its isolation group (bridges don't count), or <code>--with-group</code></td><td><code>zssctl lend --check PCI</code></td></tr>
-            <tr><td>The display server doesn't have the card open</td><td><code>zssctl status</code> lists no display server for it</td></tr>
-            <tr><td>ZSS_Interceptor manages the card (it resets the card on return)</td><td><code>zssctl status</code> shows <code>backend=zss-kmod</code></td></tr>
-            <tr><td>Another display device on the host, if the card drives a monitor</td><td><code>zssctl lend --check PCI</code></td></tr>
-          </tbody>
-        </table></div>
-        <p><code>zssctl lend --check</code> reports all of these at once, each with what would remove it. <code>--json</code> gives the same as one document. <code>sh zss-installer.run --vm-passthrough</code> adds the udev rule that keeps X and the login manager off the card's display nodes (they open every display node of their seat at start-up, even for a card they don't use).</p>
+        <p id="lend-needs"><code>zssctl lend --check</code> checks everything under <i>Needs</i> above at once and says, for each obstacle, what would remove it. <code>--json</code> gives the same as one document. <code>sh zss-installer.run --vm-passthrough</code> adds the udev rule that keeps X and the login manager off the card's display nodes (they open every display node of their seat at start-up, even for a card they don't use).</p>
 
         <h3 id="with-group">Shared isolation groups</h3>
         <p><code>--with-group</code> hands over the other devices in the card's isolation group with it. They have no host driver while the card is lent, and get it back on reclaim. On the reference laptop that is the Thunderbolt controller, so there's no Thunderbolt on the host while the card is lent. Without the option, such a device is an obstacle.</p>
@@ -863,14 +851,14 @@ zssctl reclaim 0000:01:00.0 --stay   <span class="c"># the same, leaving program
 
   <section class="section" id="loss">
     <div class="wrap">
-      <div><p class="kicker">Use</p><h2>When a card is lost unexpectedly</h2><p class="sub">Kernel and background processes stay intact; graceful power-down vs surprise power cuts.</p></div>
+      <div><p class="kicker">Use</p><h2>When a card is lost unexpectedly</h2><p class="sub">A card that loses power without being switched off first.</p></div>
       <div class="prose">
         <div class="pre" aria-label="Before you start">
           <div><h4>Needs</h4><ul><li>ZSS_Interceptor loaded, to notice the loss within a tenth of a second.</li><li>The patched NVIDIA driver, for it to be frozen before it finds out. Other drivers need PCI error handlers.</li></ul></div>
           <div><h4>Assumes</h4><ul><li>The card was idle when it went. That case is recovered cleanly without a reboot.</li><li><code>loss_while_busy</code> is left at <code>leave</code> unless you know you want otherwise.</li></ul></div>
-          <div class="warn"><h4>Watch out</h4><ul><li>If a GPU loses power or disconnects unexpectedly while actively rendering, the kernel and background processes stay intact, but the display manager may hang. Use the ZSS GPU Power Down system for clean recovery.</li><li><code>loss_while_busy = freeze</code> stops the display server until the card is back. Don't set it on a machine you use.</li><li>Don't run <code>zssctl on</code> repeatedly while it refuses: it is refusing because resuming the driver under stuck programs hung the machine in testing.</li></ul></div>
+          <div class="warn"><h4>Watch out</h4><ul><li>If a program was rendering on the card when it went, the kernel and background processes survive, but the display server may hang and the card needs a reboot. Save your work. Switching off with <code>zssctl off</code> instead never leads here.</li><li><code>loss_while_busy = freeze</code> stops the display server until the card is back. Don't set it on a machine you use.</li><li>Don't run <code>zssctl on</code> repeatedly while it refuses: it is refusing because resuming the driver under stuck programs hung the machine in testing.</li></ul></div>
         </div>
-        <p>A card that stops answering, or leaves the bus unexpectedly, is noticed by ZSS_Interceptor within about a tenth of a second. It is marked disconnected, and its driver is told through the kernel's PCI error-recovery handlers if it has them, or frozen if it is the patched NVIDIA driver. The kernel and background system processes remain fully intact. When powering down cleanly via the ZSS GPU Power Down system, the card is always recovered without issue. If the card unexpectedly loses power or disconnects while something was actively rendering, the display manager may hang. Here is what happened in real power cuts on the reference laptop:</p>
+        <p>A card that stops answering, or leaves the bus unexpectedly, is noticed by ZSS_Interceptor within about a tenth of a second. It is marked disconnected, and its driver is told through the kernel's PCI error-recovery handlers if it has them, or frozen if it is the patched NVIDIA driver. What follows depends on whether the card was in use. Here is what happened in real power cuts on the reference laptop:</p>
         <div class="table-scroll"><table>
           <thead><tr><th scope="col">The card was</th><th scope="col">The desktop</th><th scope="col">Programs on the card</th><th scope="col">Getting the card back</th></tr></thead>
           <tbody>
@@ -906,16 +894,16 @@ zssctl on 0000:01:00.0        <span class="c"># tries to restore power, then res
           <div class="warn"><h4>Watch out</h4><ul><li>A few test windows appear and disappear during the moving tests. Leave them be.</li><li><b>Run full test</b> is different: it installs ZSS and switches the discrete card off and on once, with the same freezing rules as <code>zssctl off</code>. Save your work and check <a href="#power">Switching the card off</a> first.</li></ul></div>
         </div>
         <pre><code>curl -fsSLO https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend/releases/latest/download/zss-tester.run &amp;&amp; sh zss-tester.run</code></pre>
-        <p>With PySide6 or PyQt6 installed and a desktop running, it opens a window. Otherwise it runs in the terminal (<code>--mail</code> opens your mail program at the end). It needs Python 3. It takes a few minutes, and it does three things:</p>
+        <p>With PySide6 or PyQt6 installed and a desktop running, it opens a window. Otherwise it runs in the terminal (<code>--mail</code> opens your mail program at the end). It takes a few minutes, and does three things:</p>
         <ol class="steps">
           <li><span><b>Collects facts</b>: the graphics cards and their drivers, how their power can be switched, the IOMMU, what Vulkan and OpenGL see, the display server, and graphics-related kernel messages.</span></li>
-          <li><span><b>Runs the moving tests</b>: test programs are moved between your graphics cards and back, and what they draw is compared. A few test windows appear briefly. It uses a test daemon in dry-run mode, so <b>no card is switched off and no driver is touched.</b></span></li>
+          <li><span><b>Runs the moving tests</b>: test programs are moved between your graphics cards and back, and what they draw is compared. It uses a test daemon in dry-run mode.</span></li>
           <li><span><b>Saves the report</b> as a folder and a <code>.tar.gz</code> file in your home folder.</span></li>
         </ol>
         <p>It changes nothing, installs nothing and sends nothing by itself. Before anything is saved, your computer's name, your user name and home folder, disk identifiers, serial numbers, network addresses and email addresses are replaced by placeholders.</p>
         <p><b>Send report</b> opens your mail program addressed to the author with a summary filled in. Attach the <code>.tar.gz</code> (its path is copied for you) and send.</p>
         <h3>The full test (optional)</h3>
-        <p><b>Run full test</b> goes further and does change your computer. It builds and installs ZSS with its kernel module (your graphics driver isn't patched), runs the whole test suite, and switches your discrete card off and on once. It asks for your password and shows every command first. Save your work before running it.</p>
+        <p>It builds and installs ZSS with its kernel module (your graphics driver isn't patched), runs the whole test suite, and switches your discrete card off and on once. It asks for your password and shows every command first.</p>
         <p>It builds from source, so it is offered when the kit runs from a checkout of the repository rather than from the download:</p>
         <pre><code>git clone https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend
 cd ZrnSelectiveSuspend
@@ -1036,7 +1024,7 @@ sudo ./packaging/uninstall.sh        <span class="c"># removes it again afterwar
         <ol class="steps">
           <li><span><b>Who holds the card.</b> Every process with one of the card's device nodes open is found and classed: display server, program under ZSS_AirLock, guest, system process, other.</span></li>
           <li><span><b>Move.</b> Each program under ZSS_AirLock is asked to move to another GPU (<code>default_target</code>, or the best one available). One that can't go anywhere is parked.</span></li>
-          <li><span><b>Stop and freeze.</b> Services listed in <code>stop_services</code> are stopped; other processes still holding the card are frozen, except system processes, the login manager and the terminal running <code>zssctl</code>. The card's device nodes are hidden from new programs.</span></li>
+          <li><span><b>Stop and freeze.</b> Services listed in <code>stop_services</code> are stopped; other processes still holding the card are frozen, except PID 1, logind, elogind, seatd, recognised display servers and the terminal running <code>zssctl</code>. The card's device nodes are hidden from new programs.</span></li>
           <li><span><b>PCI state</b> is saved, in the kernel if ZSS_Interceptor is loaded.</span></li>
           <li><span><b>Driver suspended</b> through its own sleep code.</span></li>
           <li><span><b>Power cut</b> through the backend: the gmux on the reference laptop.</span></li>
@@ -1046,7 +1034,7 @@ sudo ./packaging/uninstall.sh        <span class="c"># removes it again afterwar
         <h3>Rules it keeps</h3>
         <ul>
           <li>A card driving a display isn't switched off by the timer.</li>
-          <li>PID 1, the login manager and other system processes are never frozen.</li>
+          <li>PID 1, logind, elogind and seatd are never frozen: they hold the session's device nodes on its behalf.</li>
           <li>While programs are moving it writes <code>/run/zss/moving</code>, so that power managers don't pause them mid-move.</li>
           <li>Lending is refused, rather than risked, whenever the driver couldn't let go cleanly.</li>
           <li>Its state survives a restart: a lent card is still known as lent.</li>
@@ -1247,7 +1235,7 @@ zss-nvidia-patch remove     <span class="c"># put the stock driver back</span></
 
   <section class="section" id="build">
     <div class="wrap">
-      <div><p class="kicker">Reference</p><h2>Building from source</h2><p class="sub">Meson and Ninja; the Vulkan headers are fetched at build time.</p></div>
+      <div><p class="kicker">Reference</p><h2>Building from source</h2><p class="sub">Meson and Ninja; the Vulkan headers come with the source.</p></div>
       <div class="prose">
         <div class="pre" aria-label="Before you start">
           <div><h4>Needs</h4><ul><li>Meson 1.1 or later, Ninja, a C compiler, Python 3, <code>glslang</code>, and the development headers for xcb, X11 and Wayland.</li><li>Linux headers, for the kernel module.</li></ul></div>
@@ -1260,7 +1248,7 @@ meson setup build &amp;&amp; ninja -C build
 meson test -C build                 <span class="c"># host and QEMU tests: nothing on this machine is powered off</span>
 ./packaging/install.sh --check      <span class="c"># what this machine supports; changes nothing</span>
 sudo ./packaging/install.sh         <span class="c"># install</span></code></pre>
-        <p>On Arch the build needs <code>base-devel meson ninja python glslang vulkan-icd-loader vulkan-headers libxcb libx11 wayland libglvnd</code>, plus <code>linux-headers</code> for the kernel module. <code>packaging/make-bundle.sh VERSION DIR</code> makes the same <code>.run</code> files as a release.</p>
+        <p>On Arch the build needs <code>base-devel meson ninja python glslang vulkan-icd-loader libxcb libx11 wayland libglvnd</code>, plus <code>linux-headers</code> for the kernel module. <code>packaging/make-bundle.sh VERSION DIR</code> makes the same <code>.run</code> files as a release.</p>
         <h3>Where things are</h3>
         <div class="table-scroll"><table>
           <tbody>
@@ -1316,7 +1304,7 @@ zss-nvidia-patch status         <span class="c"># the driver patch</span></code>
         <p>ZrnSelectiveSuspend is Copyright © 2026 Zerone Laboratories, released under the <b>GNU General Public License, version 2 only</b>. Every source file names it in an <code>SPDX-License-Identifier</code> line. It comes with no warranty: it cuts power to hardware and patches a kernel driver, and you use it at your own risk.</p>
         <ul>
           <li><b>The NVIDIA driver patch</b>: the lines it adds are under the MIT licence, so that they can be built into NVIDIA's driver. The lines of NVIDIA's code it quotes remain NVIDIA's.</li>
-          <li><b>Vulkan-Headers</b>, fetched at build time from Khronos, are under their own licences (Apache-2.0 or MIT).</li>
+          <li><b>Vulkan-Headers</b>, from Khronos and included in <code>subprojects/</code>, are under their own licences (Apache-2.0 or MIT).</li>
           <li>The hash in <code>src/common/zss_hash.c</code> is MurmurHash3 by Austin Appleby, which is in the public domain.</li>
         </ul>
       </div>
