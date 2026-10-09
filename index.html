@@ -128,35 +128,43 @@
 
   /* Landing */
   .hero { border-bottom: 1px solid var(--line); }
-  .hero .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(1.5rem, 4vw, 3.5rem); padding-top: clamp(2rem, 5vw, 4rem); padding-bottom: clamp(2rem, 5vw, 4rem); align-items: start; }
-  .hero h1 { font-size: clamp(2.6rem, 5.6vw, 5.25rem); line-height: 0.94; letter-spacing: -0.035em; margin-bottom: 1.5rem; }
-  .hero p.lead { font-size: 1.25rem; color: var(--ink); }
+  .hero .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(1.5rem, 3.5vw, 3rem); padding-top: clamp(1.25rem, 3.5vh, 2.5rem); padding-bottom: clamp(1.25rem, 3.5vh, 2.5rem); align-items: center; }
+  .hero p.lead { font-size: clamp(1.0625rem, 0.9vw + 0.5rem, 1.3125rem); font-weight: 300; line-height: 1.42; color: var(--ink); }
   .hero p { color: var(--mute); }
-  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.75rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; }
+  .features { list-style: none; margin: 1.25rem 0 0; padding: 0; border: 1px solid var(--line); background: var(--panel); font-size: 0.9375rem; line-height: 1.4; }
+  .features li { display: grid; grid-template-columns: 1.25rem 1fr; padding: 0.35rem 0.9rem; border-bottom: 1px solid var(--faint); }
+  .features li:last-child { border-bottom: 0; }
+  .features li::before { content: "—"; color: var(--mute); }
+  @media (min-width: 1181px) {
+    /* The landing is one screen: everything above the first wiki topic fits below the title bar. */
+    .hero .wrap { min-height: calc(100dvh - var(--bar)); }
+    .device img { max-height: max(150px, calc(100dvh - var(--bar) - 30rem)); width: auto; }
+  }
   .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1.5rem; }
   .tag { display: inline-block; border: 1px solid var(--line); padding: 0.15rem 0.6rem; font-size: 0.875rem; }
   .tag.solid { background: var(--ink); color: var(--paper); }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); background: var(--panel); margin-top: 2rem; }
-  .stats > div { padding: 0.9rem 1rem; border-right: 1px solid var(--line); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); background: var(--panel); margin-top: 1.5rem; }
+  .stats > div { padding: 0.7rem 0.9rem; border-right: 1px solid var(--line); }
   .stats > div:last-child { border-right: 0; }
-  .stats b { display: block; font-weight: 300; font-stretch: 90%; font-size: 2rem; letter-spacing: -0.02em; line-height: 1.1; }
+  .stats b { display: block; font-weight: 300; font-stretch: 90%; font-size: 1.75rem; letter-spacing: -0.02em; line-height: 1.1; }
   .stats span { font-size: 0.875rem; color: var(--mute); line-height: 1.35; display: block; margin-top: 0.25rem; }
 
   figure { margin: 0; }
   .device { border: 1px solid var(--line); background: var(--panel); }
-  .device .shot { padding: clamp(1rem, 3vw, 2rem) clamp(1.5rem, 5vw, 3.5rem) 0.5rem; }
-  .device img { width: 100%; max-width: 420px; height: auto; margin: 0 auto; filter: grayscale(1) contrast(1.02); }
+  .device .shot { padding: 1rem 1.5rem 0.25rem; }
+  .device img { width: 100%; max-width: 340px; height: auto; margin: 0 auto; filter: grayscale(1) contrast(1.02); }
   .device figcaption { border-top: 1px solid var(--line); padding: 0.6rem 0.9rem; font-size: 0.875rem; display: flex; justify-content: space-between; gap: 1rem; }
   .device figcaption span:first-child { text-transform: uppercase; letter-spacing: 0.06em; color: var(--mute); }
   .device-info { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-top: 0; background: var(--panel); }
-  .device-info > * { padding: 1rem 1.1rem; }
+  .device-info { grid-template-columns: 1.25fr 1fr; }
+  .device-info > * { padding: 0.8rem 0.9rem; }
   .device-info > :first-child { border-right: 1px solid var(--line); }
-  .device-info h3 { font-size: 1.125rem; font-weight: 400; margin-bottom: 0.75rem; letter-spacing: -0.01em; }
-  .specs { margin: 0; font-size: 0.875rem; line-height: 1.4; }
-  .specs dt { color: var(--mute); font-size: 0.8125rem; }
-  .specs dd { margin: 0 0 0.6rem; }
-  .specs dd:last-child { margin-bottom: 0; }
-  .how p { font-size: 0.9375rem; color: var(--ink); margin-bottom: 0.75em; }
+  .device-info h3 { font-size: 1rem; font-weight: 400; margin-bottom: 0.5rem; letter-spacing: -0.01em; }
+  .specs { margin: 0; font-size: 0.8125rem; line-height: 1.35; display: grid; grid-template-columns: auto 1fr; column-gap: 0.75rem; row-gap: 0.3rem; }
+  .specs dt { color: var(--mute); white-space: nowrap; }
+  .specs dd { margin: 0; }
+  .how p { font-size: 0.875rem; line-height: 1.45; color: var(--ink); margin-bottom: 0.6em; }
   .how p:last-child { margin-bottom: 0; }
 
   /* Wiki sections */
@@ -328,25 +336,26 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
       <div>
-        <div class="row">
-          <span class="tag solid">Linux</span>
-          <span class="tag">Vulkan 1.1</span>
-          <span class="tag">OpenGL 3.2 via Zink</span>
-          <span class="tag">GPU passthrough</span>
-        </div>
-        <h1 id="hero-title">Switch the graphics card off. Keep everything running.</h1>
-        <p class="lead">ZrnSelectiveSuspend (ZSS) takes a graphics card out of service on a live Linux desktop. The programs drawing on it move to another GPU while they draw. The card is then powered off, or lent to a virtual machine. When it returns, everything moves back. No reboot, no log-out.</p>
-        <p>It is built to work with any GPU and any driver. So far it is proven on one laptop, a 2012 MacBook Pro with two GPUs. <a href="#hardware">Will it work here?</a> says which parts work anywhere and which are tied to that machine.</p>
+        <p class="lead" id="hero-title">ZrnSelectiveSuspend (ZSS) takes a graphics card out of service on a live Linux desktop. The programs drawing on it move to another GPU while they draw. The card is then powered off, or lent to a virtual machine. When it returns, everything moves back. No reboot, no log-out.</p>
+        <p>Built for any GPU and any driver; proven on one laptop so far. <a href="#hardware">Will it work here?</a> says which parts work anywhere.</p>
         <div class="actions">
           <a class="btn" href="#install">Install</a>
           <a class="btn ghost" href="#architecture">How it works</a>
           <a class="btn ghost" href="#testing">Help test it</a>
         </div>
         <div class="stats">
-          <div><b>0.43 s</b><span>to power the card off under X, with programs moved</span></div>
+          <div><b>0.43 s</b><span>to power the card off, programs moved</span></div>
           <div><b>2.9 s</b><span>to lend the card to a virtual machine</span></div>
           <div><b>11.2 s</b><span>to take it back, programs returned</span></div>
         </div>
+        <ul class="features" aria-label="Features">
+          <li>Moves Vulkan and OpenGL programs between GPUs while they draw</li>
+          <li>Browsers, Electron apps and Unity games move too</li>
+          <li>Powers the GPU off under a running X session, and back on</li>
+          <li>Lends the GPU to a virtual machine, and takes it back</li>
+          <li>Recovers a card that lost power while idle, with no reboot</li>
+          <li>Follows the charger: off on battery, back on at the wall</li>
+        </ul>
       </div>
 
       <div>
@@ -369,10 +378,9 @@
           </dl>
           <div class="how">
             <h3>How ZSS runs on it</h3>
-            <p>The X server runs on the Intel GPU alone and drives the panel. The NVIDIA card is a render-only device.</p>
-            <p>Programs started with <code>zss-run</code> draw on the NVIDIA card through ZSS_AirLock. Each finished frame is copied to the Intel GPU, in order, and shown from there.</p>
-            <p><code>zssctl off</code> moves those programs to the Intel GPU, suspends the patched NVIDIA driver, and cuts the card's power through the gmux. <code>zssctl on</code> does the reverse.</p>
-            <p>For a virtual machine, the card, its audio function and the Thunderbolt controller that shares its IOMMU group go to <code>vfio-pci</code>. They come back after a power cycle.</p>
+            <p>X runs on the Intel GPU alone. Programs draw on the NVIDIA card through ZSS_AirLock, and each frame is copied to the Intel GPU in order.</p>
+            <p><code>zssctl off</code> moves them to Intel, suspends the patched driver and cuts power through the gmux.</p>
+            <p>For a VM, the card and its IOMMU group go to <code>vfio-pci</code>, and come back by a power cycle.</p>
           </div>
         </div>
       </div>
