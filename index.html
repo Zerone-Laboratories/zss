@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZrnSelectiveSuspend</title>
+<meta name="description" content="Power a GPU off, move its programs to another GPU while they draw, or lend it to a virtual machine, on a running Linux desktop. Setup, use and internals.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f2f2f2;
+    --panel: #ffffff;
+    --ink: #181818;
+    --mute: #595959;
+    --faint: #dcdcdc;
+    --line: #868686;
+    --font: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "JetBrains Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+    --bar: 60px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #121212;
+      --panel: #1a1a1a;
+      --ink: #eaeaea;
+      --mute: #9d9d9d;
+      --faint: #2c2c2c;
+      --line: #6b6b6b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #121212;
+    --panel: #1a1a1a;
+    --ink: #eaeaea;
+    --mute: #9d9d9d;
+    --faint: #2c2c2c;
+    --line: #6b6b6b;
+  }
+  html { scroll-padding-top: calc(var(--bar) + 1rem); }
+
+  *, *::before, *::after { box-sizing: border-box; border-radius: 0; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 1.0625rem;
+    font-weight: 350;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  img, svg { max-width: 100%; display: block; }
+  a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+  a:hover { text-decoration-thickness: 1px; text-underline-offset: 0.3em; }
+  h1, h2, h3 { font-weight: 300; font-stretch: 90%; letter-spacing: -0.02em; line-height: 1; margin: 0; }
+  p { margin: 0 0 1em; max-width: 68ch; }
+  :focus-visible { outline: 1px solid var(--ink); outline-offset: 3px; }
+  code, kbd, pre { font-family: var(--mono); font-size: 0.875em; font-weight: 400; }
+  b, strong { font-weight: 500; }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.5rem); }
+
+  /* Title bar */
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    min-height: var(--bar);
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 0.6rem clamp(1rem, 3vw, 1.5rem);
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  .wordmark { font-weight: 400; font-stretch: 90%; font-size: 1.5rem; letter-spacing: -0.02em; text-decoration: none; white-space: nowrap; }
+  .wordmark:hover { text-decoration: none; }
+  .cmd { display: flex; align-items: stretch; min-width: 0; max-width: min(62vw, 820px); border: 1px solid var(--line); background: var(--panel); }
+  .cmd .label { padding: 0.4rem 0.75rem; border-right: 1px solid var(--line); font-size: 0.875rem; color: var(--mute); white-space: nowrap; display: flex; align-items: center; }
+  .cmd code { display: block; flex: 1; min-width: 0; padding: 0.45rem 0.75rem; white-space: nowrap; overflow-x: auto; scrollbar-width: thin; }
+  .cmd button { font: inherit; font-size: 0.875rem; font-weight: 400; cursor: pointer; border: 0; border-left: 1px solid var(--line); background: var(--ink); color: var(--paper); padding: 0.4rem 0.9rem; transition: background-color 120ms linear, color 120ms linear; min-width: 5.5rem; }
+  .cmd button:hover { background: var(--paper); color: var(--ink); }
+
+  /* Layout and sidebar */
+  .layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); align-items: start; }
+  .content { min-width: 0; }
+  .sidebar {
+    position: sticky; top: var(--bar);
+    height: calc(100dvh - var(--bar) - env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column;
+    padding: 1.25rem 1.25rem 1.5rem;
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+  }
+  .side-top { display: none; align-items: center; justify-content: space-between; gap: 1rem; }
+  .side-top span { font-weight: 400; }
+  .menu-btn { display: none; }
+  .side-nav { display: flex; flex-direction: column; flex: 1; }
+  .side-nav ul { list-style: none; margin: 0; padding: 0; }
+  .side-nav li { margin: 0; }
+  .side-nav .group { font-size: 0.8125rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); margin: 1.25rem 0.75rem 0.35rem; }
+  .side-nav .group:first-child { margin-top: 0; }
+  .side-nav a {
+    display: block; text-decoration: none; padding: 0.3rem 0.75rem; font-size: 0.96875rem;
+    border: 1px solid transparent;
+    transition: background-color 120ms linear, color 120ms linear;
+  }
+  .side-nav a:hover, .side-nav a[aria-current="true"] { background: var(--ink); color: var(--paper); }
+  .side-nav a:focus-visible { outline-offset: 1px; }
+  .side-foot { margin-top: auto; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: 0.9375rem; }
+  .side-foot p { margin: 0.75rem 0 0; color: var(--mute); }
+  .side-nav .side-foot a { display: inline; padding: 0; border: 0; font-size: inherit; text-decoration: underline; }
+  .side-nav .side-foot a:hover { background: transparent; color: var(--ink); }
+
+  /* Buttons */
+  .btn {
+    font: inherit; font-weight: 400; font-size: 1rem;
+    display: inline-block; cursor: pointer; text-decoration: none; line-height: 1.2;
+    padding: 0.75rem 1.25rem;
+    background: var(--ink); color: var(--paper); border: 1px solid var(--line);
+    transition: background-color 120ms linear, color 120ms linear;
+  }
+  .btn:hover { background: var(--paper); color: var(--ink); text-decoration: none; }
+  .btn.ghost { background: transparent; color: var(--ink); }
+  .btn.ghost:hover { background: var(--ink); color: var(--paper); }
+  .btn.small { padding: 0.4rem 0.75rem; font-size: 0.9375rem; }
+
+  /* Landing */
+  .hero { border-bottom: 1px solid var(--line); }
+  .hero .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(1.5rem, 4vw, 3.5rem); padding-top: clamp(2rem, 5vw, 4rem); padding-bottom: clamp(2rem, 5vw, 4rem); align-items: start; }
+  .hero h1 { font-size: clamp(2.6rem, 5.6vw, 5.25rem); line-height: 0.94; letter-spacing: -0.035em; margin-bottom: 1.5rem; }
+  .hero p.lead { font-size: 1.25rem; color: var(--ink); }
+  .hero p { color: var(--mute); }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.75rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1.5rem; }
+  .tag { display: inline-block; border: 1px solid var(--line); padding: 0.15rem 0.6rem; font-size: 0.875rem; }
+  .tag.solid { background: var(--ink); color: var(--paper); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); background: var(--panel); margin-top: 2rem; }
+  .stats > div { padding: 0.9rem 1rem; border-right: 1px solid var(--line); }
+  .stats > div:last-child { border-right: 0; }
+  .stats b { display: block; font-weight: 300; font-stretch: 90%; font-size: 2rem; letter-spacing: -0.02em; line-height: 1.1; }
+  .stats span { font-size: 0.875rem; color: var(--mute); line-height: 1.35; display: block; margin-top: 0.25rem; }
+
+  figure { margin: 0; }
+  .device { border: 1px solid var(--line); background: var(--panel); }
+  .device .shot { padding: clamp(1rem, 3vw, 2rem) clamp(1.5rem, 5vw, 3.5rem) 0.5rem; }
+  .device img { width: 100%; max-width: 420px; height: auto; margin: 0 auto; filter: grayscale(1) contrast(1.02); }
+  .device figcaption { border-top: 1px solid var(--line); padding: 0.6rem 0.9rem; font-size: 0.875rem; display: flex; justify-content: space-between; gap: 1rem; }
+  .device figcaption span:first-child { text-transform: uppercase; letter-spacing: 0.06em; color: var(--mute); }
+  .device-info { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-top: 0; background: var(--panel); }
+  .device-info > * { padding: 1rem 1.1rem; }
+  .device-info > :first-child { border-right: 1px solid var(--line); }
+  .device-info h3 { font-size: 1.125rem; font-weight: 400; margin-bottom: 0.75rem; letter-spacing: -0.01em; }
+  .specs { margin: 0; font-size: 0.875rem; line-height: 1.4; }
+  .specs dt { color: var(--mute); font-size: 0.8125rem; }
+  .specs dd { margin: 0 0 0.6rem; }
+  .specs dd:last-child { margin-bottom: 0; }
+  .how p { font-size: 0.9375rem; color: var(--ink); margin-bottom: 0.75em; }
+  .how p:last-child { margin-bottom: 0; }
+
+  /* Wiki sections */
+  .section { border-bottom: 1px solid var(--line); }
+  .section > .wrap { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: clamp(1rem, 3vw, 2.5rem); padding-top: clamp(2rem, 5vw, 3.5rem); padding-bottom: clamp(2rem, 5vw, 3.5rem); }
+  .section h2 { font-size: 2rem; }
+  .section .sub { color: var(--mute); font-size: 0.9375rem; margin-top: 0.75rem; max-width: 24ch; }
+  .kicker { font-size: 0.8125rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); margin-bottom: 0.6rem; }
+  .prose { min-width: 0; }
+  .prose h3 { font-size: 1.375rem; margin: 2.25rem 0 0.85rem; }
+  .prose > h3:first-child { margin-top: 0; }
+  .prose ul, .prose ol { margin: 0 0 1.1em; padding-left: 1.25rem; max-width: 70ch; }
+  .prose li { margin: 0 0 0.4em; }
+  .prose li::marker { color: var(--mute); }
+  .prose p code, .prose li code, .prose td code, .prose dd code { border: 1px solid var(--faint); padding: 0 0.25em; background: var(--panel); white-space: nowrap; }
+  pre { background: var(--panel); border: 1px solid var(--line); padding: 0.85rem 1rem; margin: 0 0 1.25rem; overflow-x: auto; line-height: 1.5; tab-size: 4; }
+  pre .c { color: var(--mute); }
+  .note { color: var(--mute); font-size: 0.9375rem; }
+
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); background: var(--panel); margin-bottom: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; min-width: 560px; font-size: 0.96875rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--faint); font-weight: 350; }
+  thead th { font-weight: 500; border-bottom: 1px solid var(--line); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr { transition: background-color 120ms linear, color 120ms linear; }
+  tbody tr:hover { background: var(--ink); color: var(--paper); }
+  tbody tr:hover code { background: transparent; border-color: var(--line); }
+  td.k { white-space: nowrap; font-weight: 400; }
+
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); background: var(--panel); margin-bottom: 1.25rem; }
+  .cols > div { padding: 1.25rem; border-right: 1px solid var(--line); }
+  .cols > div:last-child { border-right: 0; }
+  .cols h3 { font-size: 1.375rem; margin: 0 0 0.75rem; }
+  .cols p { margin: 0; color: var(--mute); }
+
+  .alert { border: 1px solid var(--line); background: var(--panel); padding: 0.85rem 1rem; max-width: 72ch; margin-bottom: 1.25rem; }
+  .alert b { display: block; font-weight: 500; }
+  .alert.dashed { border-style: dashed; }
+
+  .steps { counter-reset: s; list-style: none; padding: 0 !important; border: 1px solid var(--line); background: var(--panel); max-width: none !important; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 2.5rem 1fr; gap: 0.5rem; padding: 0.7rem 1rem; margin: 0 !important; border-bottom: 1px solid var(--faint); }
+  .steps li:last-child { border-bottom: 0; }
+  .steps li::before { content: counter(s); font-variant-numeric: tabular-nums; color: var(--mute); }
+
+  .qa { border: 1px solid var(--line); background: var(--panel); margin: 0 0 1.25rem; }
+  .qa > div { padding: 0.85rem 1rem; border-bottom: 1px solid var(--faint); }
+  .qa > div:last-child { border-bottom: 0; }
+  .qa dt { font-weight: 500; margin-bottom: 0.3rem; }
+  .qa dd { margin: 0; color: var(--mute); }
+  .qa dd p { margin: 0 0 0.5em; }
+  .qa dd p:last-child { margin: 0; }
+
+  .diagram { border: 1px solid var(--line); background: var(--panel); margin-bottom: 1.25rem; overflow-x: auto; }
+  .diagram svg { min-width: 640px; width: 100%; height: auto; }
+  .diagram figcaption { border-top: 1px solid var(--line); padding: 0.6rem 0.9rem; font-size: 0.875rem; color: var(--mute); }
+  .dia rect { fill: var(--panel); stroke: var(--ink); stroke-width: 1; }
+  .dia rect.solid { fill: var(--ink); }
+  .dia line, .dia path { stroke: var(--ink); stroke-width: 1; fill: none; }
+  .dia .dash { stroke-dasharray: 4 4; stroke: var(--line); }
+  .dia text { fill: var(--ink); font-family: Archivo, Arial, sans-serif; font-size: 14px; font-weight: 400; }
+  .dia text.m { fill: var(--mute); font-size: 12.5px; font-weight: 350; }
+  .dia text.inv { fill: var(--paper); }
+  .dia text.t { font-size: 16px; }
+
+  /* Footer */
+  footer .wrap { display: grid; grid-template-columns: 220px 1fr 1fr; gap: clamp(1rem, 4vw, 3rem); padding-top: 2rem; padding-bottom: 2.5rem; font-size: 0.9375rem; }
+  footer p { margin: 0 0 0.25rem; }
+  footer .mute { color: var(--mute); }
+
+  /* Responsive */
+  @media (max-width: 1180px) {
+    .hero .wrap { grid-template-columns: 1fr; }
+    .device img { max-width: 360px; }
+  }
+  @media (max-width: 1000px) {
+    .section > .wrap { grid-template-columns: 1fr; }
+    .section .sub { max-width: none; }
+    .cols { grid-template-columns: 1fr; }
+    .cols > div { border-right: 0; border-bottom: 1px solid var(--line); }
+    .cols > div:last-child { border-bottom: 0; }
+    footer .wrap { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 860px) {
+    html { scroll-padding-top: 1rem; }
+    .topbar { position: static; flex-wrap: wrap; }
+    .cmd { max-width: none; width: 100%; }
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 0.75rem clamp(1rem, 4vw, 2.5rem); overflow: visible; }
+    .side-top { display: flex; }
+    .menu-btn { display: inline-block; }
+    .side-nav { display: none; margin-top: 1rem; }
+    .side-nav.open { display: flex; }
+    .side-foot { margin-top: 1rem; }
+  }
+  @media (max-width: 600px) {
+    .device-info { grid-template-columns: 1fr; }
+    .device-info > :first-child { border-right: 0; border-bottom: 1px solid var(--line); }
+    .stats { grid-template-columns: 1fr; }
+    .stats > div { border-right: 0; border-bottom: 1px solid var(--line); }
+    .stats > div:last-child { border-bottom: 0; }
+    .cmd .label { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="wordmark" href="#top">ZrnSelectiveSuspend</a>
+  <div class="cmd" role="group" aria-label="Install with one command">
+    <span class="label">Install</span>
+    <code id="oneliner">curl -fsSLO https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend/releases/latest/download/zss-installer.run &amp;&amp; sh zss-installer.run</code>
+    <button type="button" data-copy="oneliner">Copy</button>
+  </div>
+</header>
+
+<div class="layout">
+
+<aside class="sidebar">
+  <div class="side-top">
+    <span>Contents</span>
+    <button class="btn ghost small menu-btn" id="menu" type="button" aria-expanded="false" aria-controls="side-nav">Menu</button>
+  </div>
+  <nav class="side-nav" id="side-nav" aria-label="Wiki">
+    <ul>
+      <li class="group">Start</li>
+      <li><a href="#top">Overview</a></li>
+      <li><a href="#what">What it does</a></li>
+      <li><a href="#install">Installing</a></li>
+      <li><a href="#hardware">Will it work here?</a></li>
+      <li class="group">Use</li>
+      <li><a href="#run">Running programs under ZSS</a></li>
+      <li><a href="#power">Switching the card off and on</a></li>
+      <li><a href="#move">Moving programs by hand</a></li>
+      <li><a href="#battery">On battery</a></li>
+      <li><a href="#lend">Lending to a virtual machine</a></li>
+      <li><a href="#loss">When a card is lost</a></li>
+      <li><a href="#testing">Helping test it</a></li>
+      <li class="group">How it works</li>
+      <li><a href="#architecture">The three parts</a></li>
+      <li><a href="#airlock">ZSS_AirLock</a></li>
+      <li><a href="#daemon">The daemon</a></li>
+      <li><a href="#interceptor">ZSS_Interceptor</a></li>
+      <li><a href="#patch">The NVIDIA patch</a></li>
+      <li><a href="#states">Device states</a></li>
+      <li class="group">Reference</li>
+      <li><a href="#zssctl">zssctl</a></li>
+      <li><a href="#zss-run">zss-run</a></li>
+      <li><a href="#config">Configuration</a></li>
+      <li><a href="#env">Environment variables</a></li>
+      <li><a href="#build">Building from source</a></li>
+      <li><a href="#trouble">Troubleshooting</a></li>
+      <li><a href="#licence">Licence</a></li>
+    </ul>
+    <div class="side-foot">
+      <button class="btn ghost small" id="theme" type="button" aria-pressed="false">Dark mode</button>
+      <p><a href="https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend">Source on GitHub</a></p>
+      <p>GPL-2.0-only · Zerone Laboratories</p>
+    </div>
+  </nav>
+</aside>
+
+<div class="content">
+<main id="top">
+
+  <!-- ============================== LANDING ============================== -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div>
+        <div class="row">
+          <span class="tag solid">Linux</span>
+          <span class="tag">Vulkan 1.1</span>
+          <span class="tag">OpenGL 3.2 via Zink</span>
+          <span class="tag">GPU passthrough</span>
+        </div>
+        <h1 id="hero-title">Switch the graphics card off. Keep everything running.</h1>
+        <p class="lead">ZrnSelectiveSuspend (ZSS) takes a graphics card out of service on a live Linux desktop. The programs drawing on it move to another GPU while they draw. The card is then powered off, or lent to a virtual machine. When it returns, everything moves back. No reboot, no log-out.</p>
+        <p>It is built to work with any GPU and any driver. So far it is proven on one laptop, a 2012 MacBook Pro with two GPUs. <a href="#hardware">Will it work here?</a> says which parts work anywhere and which are tied to that machine.</p>
+        <div class="actions">
+          <a class="btn" href="#install">Install</a>
+          <a class="btn ghost" href="#architecture">How it works</a>
+          <a class="btn ghost" href="#testing">Help test it</a>
+        </div>
+        <div class="stats">
+          <div><b>0.43 s</b><span>to power the card off under X, with programs moved</span></div>
+          <div><b>2.9 s</b><span>to lend the card to a virtual machine</span></div>
+          <div><b>11.2 s</b><span>to take it back, programs returned</span></div>
+        </div>
+      </div>
+
+      <div>
+        <figure class="device">
+          <div class="shot"><img src="assets/macbook-pro-2012.png" width="512" height="512" alt="A MacBook Pro 15-inch from 2012, seen from above with the lid open"></div>
+          <figcaption><span>Tested on</span><span>MacBook Pro 15-inch, Mid 2012</span></figcaption>
+        </figure>
+        <div class="device-info">
+          <dl class="specs" aria-label="Technical specifications">
+            <dt>Model</dt><dd>MacBookPro9,1</dd>
+            <dt>Processor</dt><dd>Intel Core i7-3615QM, 4 cores, Ivy Bridge, VT-d</dd>
+            <dt>Memory</dt><dd>16 GB</dd>
+            <dt>Integrated GPU</dt><dd>Intel HD Graphics 4000 (<code>i915</code>, Mesa <code>hasvk</code>)</dd>
+            <dt>Discrete GPU</dt><dd>NVIDIA GeForce GT 650M Mac Edition, 512 MB, Kepler GK107</dd>
+            <dt>GPU driver</dt><dd>NVIDIA 470.256.02 with the ZSS patch, revision 5</dd>
+            <dt>Display switch</dt><dd>Apple gmux, classic (v1.9.35)</dd>
+            <dt>Thunderbolt</dt><dd>Intel CV82524 “Lightridge”</dd>
+            <dt>Panel</dt><dd>15.4-inch, 1440 × 900</dd>
+            <dt>System</dt><dd>Arch Linux, kernel 7.2, X11</dd>
+          </dl>
+          <div class="how">
+            <h3>How ZSS runs on it</h3>
+            <p>The X server runs on the Intel GPU alone and drives the panel. The NVIDIA card is a render-only device.</p>
+            <p>Programs started with <code>zss-run</code> draw on the NVIDIA card through ZSS_AirLock. Each finished frame is copied to the Intel GPU, in order, and shown from there.</p>
+            <p><code>zssctl off</code> moves those programs to the Intel GPU, suspends the patched NVIDIA driver, and cuts the card's power through the gmux. <code>zssctl on</code> does the reverse.</p>
+            <p>For a virtual machine, the card, its audio function and the Thunderbolt controller that shares its IOMMU group go to <code>vfio-pci</code>. They come back after a power cycle.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== START ============================== -->
+  <section class="section" id="what">
+    <div class="wrap">
+      <div><p class="kicker">Start</p><h2>What it does</h2><p class="sub">Three things a running desktop normally can't do with its graphics card.</p></div>
+      <div class="prose">
+        <div class="cols">
+          <div><h3>Power off</h3><p>Switch the discrete GPU off while X and your programs keep running. The card draws 0 W until you switch it back on, or until the charger is plugged in.</p></div>
+          <div><h3>Move</h3><p>Move Vulkan programs, OpenGL programs (through Zink), browsers, Electron apps and Unity games from one GPU to another while they draw, and back again.</p></div>
+          <div><h3>Lend</h3><p>Hand the card to a virtual machine through <code>vfio-pci</code> and take it back afterwards. The host's programs are moved away and then returned.</p></div>
+        </div>
+        <h3>Also</h3>
+        <ul>
+          <li><b>Survives a card that vanishes while idle.</b> A card that loses power without warning is noticed within about a tenth of a second. Its driver is frozen before it can hang the machine, and <code>zssctl on</code> brings back the card and its driver without a reboot.</li>
+          <li><b>Rebuilds programs after a loss.</b> Programs under ZSS_AirLock whose GPU disappears are rebuilt from memory on another GPU, or parked until one is available.</li>
+          <li><b>Follows the charger.</b> Unplug it and the card switches off with its programs moved; plug it back in and they return.</li>
+          <li><b>Idle timer.</b> An unused card can be switched off after a set time and comes back when something asks for it.</li>
+          <li><b>Hides a switched-off card</b> from programs started meanwhile, as if it had been unplugged, so that nothing new wakes it.</li>
+          <li><b>Freezes what it can't move.</b> A program that uses the card but wasn't started under ZSS is paused while the card is off and resumed afterwards. The report names it.</li>
+          <li><b>Tester kit.</b> A report of what any machine has for ZSS, with the moving tests, ready to email.</li>
+        </ul>
+        <h3>What it doesn't do</h3>
+        <ul>
+          <li>It doesn't start or configure virtual machines. It prepares the host side, and any passthrough setup works after that.</li>
+          <li>It never edits your bootloader configuration. Switching the IOMMU on, if you want lending, is your step.</li>
+          <li>It can't move a program that wasn't started under ZSS_AirLock. Such a program is frozen, or it blocks the operation.</li>
+          <li>It doesn't yet recover a card lost <em>while a program is rendering on it</em>. See <a href="#loss">When a card is lost</a>.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="install">
+    <div class="wrap">
+      <div><p class="kicker">Start</p><h2>Installing</h2><p class="sub">One command, or look first with <code>--check</code>.</p></div>
+      <div class="prose">
+        <div class="alert"><b>Read this first</b>ZSS cuts power to hardware and can patch a kernel driver. The installer asks before it patches the GPU driver and before it builds the kernel module. It never touches the bootloader. You use it at your own risk; it comes with no warranty.</div>
+
+        <h3 id="one-line">In one line</h3>
+        <pre><code id="install-line">curl -fsSLO https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend/releases/latest/download/zss-installer.run &amp;&amp; sh zss-installer.run</code></pre>
+        <p>This downloads the latest release's installer into the current folder and runs it. The installer is a shell script with a compressed archive attached. Run, it does four things:</p>
+        <ol class="steps">
+          <li><span>Unpacks itself into a temporary folder and asks for your password (through <code>sudo</code>).</span></li>
+          <li><span>Installs the daemon, the control tool and the launcher, creates the <code>zss</code> group and adds you to it, and sets up the <code>zssd</code> service.</span></li>
+          <li><span>If your GPU driver is one the patch has been validated against, offers to patch it. Then it offers ZSS_Interceptor, the kernel module. Both go through DKMS, so they survive kernel updates.</span></li>
+          <li><span>Records what your machine has for ZSS, together with its own log, in <code>~/.zss/debug.log</code>. If something failed, it also saves a full report and offers to open your mail program to send it.</span></li>
+        </ol>
+        <p>Arguments after <code>sh zss-installer.run</code> go to the installer, for example <code>sh zss-installer.run --vm-passthrough</code>. Log in again afterwards so your new group membership takes effect.</p>
+
+        <h3 id="check">Look before you install</h3>
+        <pre><code>sh zss-installer.run --check</code></pre>
+        <p>This says what the machine supports and changes nothing. It covers the GPUs and their drivers, which power backend would be used, whether the driver patch applies, the kernel module, and (for lending) whether the IOMMU is on and whether the card shares its isolation group with other devices.</p>
+
+        <h3 id="installer-options">Installer options</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Option</th><th scope="col">Effect</th></tr></thead>
+          <tbody>
+            <tr><td class="k"><code>--check</code></td><td>Report what this machine supports. Changes nothing, needs no password.</td></tr>
+            <tr><td class="k"><code>--patch-driver</code></td><td>Apply the NVIDIA wake-on-touch patch without asking.</td></tr>
+            <tr><td class="k"><code>--no-patch-driver</code></td><td>Never touch the GPU driver.</td></tr>
+            <tr><td class="k"><code>--kernel-module</code></td><td>Build and install ZSS_Interceptor without asking.</td></tr>
+            <tr><td class="k"><code>--no-kernel-module</code></td><td>Don't install the kernel module. The daemon then does a narrower version of its work from user space (NVIDIA and gmux only).</td></tr>
+            <tr><td class="k"><code>--vm-passthrough</code></td><td>Also prepare the GPU for lending: a udev rule keeps the display server and the login manager off the card's display nodes.</td></tr>
+            <tr><td class="k"><code>--no-start</code></td><td>Install everything but leave the service alone (when a reboot is next anyway).</td></tr>
+            <tr><td class="k"><code>--build DIR</code></td><td>From source only: the Meson build folder (default <code>./build</code>).</td></tr>
+            <tr><td class="k"><code>--destdir DIR</code></td><td>From source only: install into a staging root. Skips everything that acts on the running system.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h3 id="installed">What gets installed</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">What</th><th scope="col">Where</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Daemon, control tool, launcher</td><td><code>zssd</code>, <code>zssctl</code>, <code>zss-run</code> under <code>/usr/local</code></td></tr>
+            <tr><td class="k">ZSS_AirLock</td><td><code>libzss_airlock.so</code> and its Vulkan driver manifest, used only by programs started under it</td></tr>
+            <tr><td class="k">Service</td><td><code>zssd.service</code>, settings in <code>/etc/zss/zssd.conf</code></td></tr>
+            <tr><td class="k">Group</td><td><code>zss</code>: members may switch GPUs off and on</td></tr>
+            <tr><td class="k">Helpers</td><td><code>zss-nvidia-patch</code> (patch status, apply, remove), <code>zss-power-event</code> (charger events)</td></tr>
+            <tr><td class="k">Driver patch (optional)</td><td>Through DKMS, with a pacman hook that re-applies it after a driver update, and <code>zss-nvidia-check.service</code>, which restores the stock modules at boot if the patched driver doesn't load</td></tr>
+            <tr><td class="k">Kernel module (optional)</td><td><code>zss.ko</code> through DKMS. Loaded when <code>zssd</code> starts, never from the initial ramdisk, so it can't stop the machine from booting</td></tr>
+            <tr><td class="k">Lending rule (optional)</td><td><code>/etc/udev/rules.d/72-zss-lend-seat.rules</code></td></tr>
+          </tbody>
+        </table></div>
+        <p>The initial ramdisk is regenerated only if the GPU driver is part of it, and the installer says so first. If no GPU could be detected for <code>/etc/zss/zssd.conf</code>, the installer says so: set <code>gpu =</code> there and run <code>sudo systemctl enable --now zssd</code>.</p>
+
+        <h3 id="after">After installing</h3>
+        <pre><code>zssctl status                  <span class="c"># the managed GPU, its state, wake support, who is using it</span>
+zss-run vkcube                 <span class="c"># a program on the dedicated GPU, under ZSS_AirLock</span>
+zssctl off 0000:01:00.0        <span class="c"># move it away and switch the card off</span>
+zssctl on 0000:01:00.0         <span class="c"># switch it on and bring the program back</span></code></pre>
+        <p>Find your card's address with <code>lspci -D | grep -i -E 'vga|3d'</code>.</p>
+
+        <h3 id="tester-download">The tester kit</h3>
+        <pre><code id="tester-line">curl -fsSLO https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend/releases/latest/download/zss-tester.run &amp;&amp; sh zss-tester.run</code></pre>
+        <p>It changes nothing and installs nothing. See <a href="#testing">Helping test it</a>.</p>
+
+        <h3 id="releases">Releases</h3>
+        <p>Every push to the main branch builds, tests and publishes a release on GitHub with two downloads: <code>zss-installer-VERSION.run</code> and <code>zss-tester-VERSION.run</code>. <code>zss-installer.run</code> and <code>zss-tester.run</code> are the same files under names that never change, which is what the one-liners use. Versions are <code>MAJOR.MINOR.PATCH</code>; the patch number counts up with each release.</p>
+        <p>Both files are built on Arch Linux, so they need a distribution whose libraries are about as new. On an older system, <a href="#build">build from source</a>.</p>
+
+        <h3 id="uninstall">Removing it</h3>
+        <pre><code>sh zss-installer.run --unpack-only ~/zss-installer
+sudo ~/zss-installer/packaging/uninstall.sh            <span class="c"># --purge also drops the settings and the group</span>
+zss-nvidia-patch remove                                <span class="c"># if you patched the driver: puts the stock driver back</span></code></pre>
+        <p>From a source checkout, <code>sudo ./packaging/uninstall.sh</code>. On Arch, <code>packaging/arch/</code> builds a package instead, which pacman then removes.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="hardware">
+    <div class="wrap">
+      <div><p class="kicker">Start</p><h2>Will it work here?</h2><p class="sub">Written for any GPU; proven on one machine. Here is which part is which.</p></div>
+      <div class="prose">
+        <p>The parts that move programs are vendor-neutral and work with any Vulkan driver. The parts that cut power are tied to hardware: today, power-off under a running desktop needs an Apple laptop with a classic gmux and the patched NVIDIA 470 driver. On other machines the installer says so and installs program migration only.</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Part</th><th scope="col">Works with</th><th scope="col">Tested on</th></tr></thead>
+          <tbody>
+            <tr><td>Moving programs between GPUs (ZSS_AirLock)</td><td>Any Vulkan driver: NVIDIA, Mesa (Intel, AMD, nouveau), software</td><td>NVIDIA 470, Intel <code>hasvk</code>, llvmpipe</td></tr>
+            <tr><td>Moving OpenGL programs (through Mesa's Zink)</td><td>Any Vulkan driver. ZSS_AirLock supplies dynamic rendering and <code>VK_KHR_maintenance5</code> where a driver lacks them</td><td>NVIDIA 470, Intel <code>hasvk</code> (OpenGL 3.2)</td></tr>
+            <tr><td>Showing frames from one GPU on a screen driven by another, in order</td><td>Drivers that don't hand frames across themselves (NVIDIA proprietary, card not in X)</td><td>NVIDIA 470 to Intel</td></tr>
+            <tr><td>Lending to a virtual machine and taking it back</td><td>Any PCI GPU behind an IOMMU, with ZSS_Interceptor; the display server must not hold the card</td><td>MacBookPro9,1 with a QEMU guest; QEMU with an emulated IOMMU</td></tr>
+            <tr><td>Recovering programs when a GPU vanishes</td><td>Any Vulkan driver</td><td>QEMU, by pulling a virtual card</td></tr>
+            <tr><td>Daemon, <code>zssctl</code>, rules, freezing, idle timer</td><td>Any GPU</td><td>Host tests and QEMU</td></tr>
+            <tr><td>Quiescing the driver before a power cut (<code>quiesce=pm</code>)</td><td>Any driver that survives a laptop suspend: <code>amdgpu</code>, <code>i915</code>, <code>xe</code>, <code>nouveau</code>, …</td><td><b>QEMU's <code>bochs</code> driver only</b></td></tr>
+            <tr><td>Saving and restoring PCI state, noticing a lost card</td><td>Any PCI GPU</td><td>QEMU; MacBookPro9,1</td></tr>
+            <tr><td>Cutting power: Apple classic gmux</td><td>Apple laptops with a classic gmux</td><td>MacBookPro9,1</td></tr>
+            <tr><td>Cutting power: firmware power resources (<code>acpi</code>)</td><td>Most hybrid laptops since about 2015</td><td><b>Nowhere yet: written, never run</b></td></tr>
+            <tr><td>Cutting power: PCIe hot-plug slot</td><td>Any driver, on a hot-plug slot</td><td>QEMU only</td></tr>
+            <tr><td>Power-off under a running display server</td><td><b>NVIDIA 470.256.02 with the patch only</b></td><td>MacBookPro9,1</td></tr>
+            <tr><td>Recovering card and driver after a sudden power loss, card idle</td><td>NVIDIA 470.256.02 with the patch; drivers with PCI error handlers in principle</td><td>MacBookPro9,1</td></tr>
+            <tr><td>The same, with a program rendering on the card</td><td><b>Nothing yet</b></td><td>Failed on MacBookPro9,1</td></tr>
+            <tr><td>Hiding a switched-off GPU from new programs</td><td>Device nodes: any driver. Loader and <code>/proc</code> files: NVIDIA only</td><td>MacBookPro9,1</td></tr>
+          </tbody>
+        </table></div>
+        <h3>What it would take to cover more</h3>
+        <ul>
+          <li><b><code>amdgpu</code>, <code>i915</code>/<code>xe</code>, <code>nouveau</code>.</b> ZSS_Interceptor already runs any driver's own sleep and wake code, which also re-runs the card's video BIOS when power returns. What's missing is a trial on real hardware for each driver.</li>
+          <li><b>Another laptop.</b> The <code>acpi</code> backend should cover most of them and needs someone with such a machine to try it. Other platforms need a backend of their own: three functions (probe, power off, power on).</li>
+          <li><b>Other NVIDIA versions.</b> The patch has to be checked against each one and added to <code>patches/validated-versions</code>.</li>
+        </ul>
+        <p>The quickest way to help is the <a href="#testing">tester kit</a>: its report says exactly which of these rows your machine falls under.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== USE ============================== -->
+  <section class="section" id="run">
+    <div class="wrap">
+      <div><p class="kicker">Use</p><h2>Running programs under ZSS</h2><p class="sub">Only programs started under ZSS_AirLock can be moved.</p></div>
+      <div class="prose">
+        <p>ZSS_AirLock is a Vulkan driver that sits in front of the real ones. A program has to be started under it to be movable. <code>zss-run</code> does that, and starts the program on the dedicated GPU.</p>
+        <pre><code>zss-run vkcube                     <span class="c"># a Vulkan program, on the dedicated GPU</span>
+zss-run --gl glxgears              <span class="c"># an OpenGL program, through Zink</span>
+zss-run --on 0000:00:02.0 vkcube   <span class="c"># start on another GPU (a PCI address, part of a name, or "any")</span>
+zss-run chromium                   <span class="c"># Chromium and Electron apps get their Vulkan switches automatically</span>
+zss-run --print code .             <span class="c"># show what would run, run nothing</span></code></pre>
+
+        <h3 id="run-vulkan">Vulkan programs</h3>
+        <p>Programs see a Vulkan 1.1 device, with the extensions ZSS_AirLock can carry across a move. Programs that need Vulkan 1.2 or later don't start under it yet; run those without <code>zss-run</code>.</p>
+        <p>What a program is offered is what <em>every</em> GPU it may move to has, so that nothing it turns on can hold it to one card. On the reference laptop that withholds seven features of the NVIDIA card. <code>ZSS_PROFILE=native</code> offers each GPU's own features instead; a program that uses the difference is then parked rather than moved.</p>
+
+        <h3 id="run-opengl">OpenGL programs</h3>
+        <p><code>zss-run --gl</code> runs the program on Mesa's Zink, which draws OpenGL through Vulkan. The program is then under ZSS_AirLock like any Vulkan program and can be moved. On the reference laptop's two GPUs that gives OpenGL 3.2 and OpenGL ES 3.1.</p>
+        <p>Zink needs two things the NVIDIA 470 driver lacks: dynamic rendering and <code>VK_KHR_maintenance5</code>. ZSS_AirLock provides both itself on such a driver.</p>
+
+        <h3 id="run-chromium">Browsers and Electron apps</h3>
+        <p><code>zss-run</code> recognises a program built on Chromium by the runtime files beside its binary, following launcher scripts to find it. It then adds two switches:</p>
+        <ul>
+          <li><code>--use-angle=vulkan</code> makes ANGLE, which gives Chromium its OpenGL ES, draw through Vulkan.</li>
+          <li><code>--enable-features=Vulkan</code> makes Chromium's compositor draw and present through Vulkan as well.</li>
+        </ul>
+        <p>Without them, Chromium draws through OpenGL, creates no Vulkan device, and isn't movable. <code>--plain</code> leaves the arguments alone. Recognised on the reference laptop: <code>chromium</code>, <code>helium-browser</code>, <code>code</code> (VS Code) and <code>teams-for-linux</code>. Chromium was moved between the NVIDIA and Intel GPUs while drawing, and kept the same GPU process throughout.</p>
+
+        <h3 id="run-games">Games</h3>
+        <ul>
+          <li><b>Unity games</b> use OpenGL on Linux unless told otherwise. Start them with <code>zss-run ./Game.x86_64 -force-vulkan</code>, or under OpenGL with <code>zss-run --gl ./Game.x86_64</code>. IFSCL runs and moves under both renderers.</li>
+          <li><b>Steam</b>: in the game's <i>Properties → Launch options</i>, write <code>zss-run %command%</code> for a Vulkan game or <code>zss-run --gl %command%</code> for an OpenGL one. A game that Steam runs inside its runtime container may not see ZSS_AirLock; if <code>ZSS_DEBUG=1</code> prints nothing, start the game's own binary with <code>zss-run</code> instead.</li>
+          <li><b>Proton and DXVK</b> need Vulkan 1.3, which ZSS_AirLock doesn't offer yet.</li>
+          <li><b>Memory.</b> A program can only move to a GPU with room for it. A game that fills the NVIDIA card's memory can fail to move to the Intel GPU, which has about 1.5 GB to share.</li>
+        </ul>
+
+        <h3 id="run-router">Everything you start, without typing <code>zss-run</code></h3>
+        <p><b>ZrnLaunchRouter</b> is a separate, optional project. A small library, preloaded into the desktop session, looks at every program as it starts, whether from the menu, the runner, the dock, the file manager or a terminal. It gives it what <code>zss-run</code> would give it:</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Program</th><th scope="col">Recognised by</th><th scope="col">What it gets</th></tr></thead>
+          <tbody>
+            <tr><td>Built on Chromium</td><td><code>icudtl.dat</code> and a V8 snapshot beside the binary, and a binary that knows <code>--use-angle</code></td><td>The ZSS environment and the two Vulkan switches</td></tr>
+            <tr><td>Uses Vulkan</td><td>Links or names <code>libvulkan.so.1</code></td><td>The ZSS environment</td></tr>
+            <tr><td>Unity game with Vulkan</td><td>A <code>&lt;name&gt;_Data</code> folder beside the binary</td><td>The ZSS environment and <code>-force-vulkan</code></td></tr>
+            <tr><td>Anything else</td><td></td><td>Nothing</td></tr>
+          </tbody>
+        </table></div>
+        <pre><code>zrn-launch-router on                     <span class="c"># from the next login</span>
+zrn-launch-router check helium-browser   <span class="c"># what it would do with a program</span>
+zrn-launch-router log                    <span class="c"># what was routed, and why</span>
+zrn-launch-router off</code></pre>
+        <p>Chromium's helper processes, and anything already under ZSS, are left alone. If ZSS isn't installed, or anything is in doubt, the program starts exactly as asked.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="power">
+    <div class="wrap">
+      <div><p class="kicker">Use</p><h2>Switching the card off and on</h2><p class="sub">Programs move first; then the driver sleeps; then the power goes.</p></div>
+      <div class="prose">
+        <pre><code>zssctl status                 <span class="c"># state, wake support, who is using the GPU</span>
+zssctl off 0000:01:00.0       <span class="c"># move programs away, suspend the driver, cut power</span>
+zssctl on 0000:01:00.0        <span class="c"># power on and bring the programs back</span>
+zssctl on 0000:01:00.0 --stay <span class="c"># power on, leave the programs where they are</span></code></pre>
+        <p>Each step is printed as it happens:</p>
+        <pre><code>[ZrnSelectiveSuspend] Suspending device: 0000:01:00.0  NVIDIA Corporation GK107M [GeForce GT 650M Mac Edition]
+[ZrnSelectiveSuspend]   driver nvidia, power through zss-kmod, wake on demand: yes
+[ZrnSelectiveSuspend]   [1/7] In use by: Xorg (display server, idle), vkcube (application, will be moved)
+[ZrnSelectiveSuspend]   [2/7] Applications: 1 moved to 0000:00:02.0, 0 parked
+[ZrnSelectiveSuspend]   [3/7] Services stopped: nvidia-persistenced; processes frozen: none
+[ZrnSelectiveSuspend]         Hidden from new programs (17): /dev/nvidia0, /dev/dri/card2, ...
+[ZrnSelectiveSuspend]   [4/7] PCI state: saved and restored in the kernel (zss module)
+[ZrnSelectiveSuspend]   [5/7] Driver nvidia suspended (0.13 s)
+[ZrnSelectiveSuspend]   [6/7] Power cut through zss-kmod (0.03 s); the device has left the bus
+[ZrnSelectiveSuspend]   [7/7] Watching for wake requests
+[ZrnSelectiveSuspend] Device 0000:01:00.0 is powered off (0.43 s).</code></pre>
+
+        <h3 id="stays-off">A card you switch off stays off</h3>
+        <ul>
+          <li>Programs you start meanwhile don't see it, as if it had been unplugged. Vulkan and OpenGL programs run on the other GPU, and <code>nvidia-smi</code> says it can't reach the device.</li>
+          <li>If the display server needs the card for a moment, it gets it, and the card switches off again a second or two later. <code>zssctl status</code> counts these as <code>served=</code>.</li>
+          <li>If the card has started driving a display by then, it stays on.</li>
+          <li><code>hide_while_off = no</code> in the settings turns hiding off. A program that then reaches the driver waits until <code>zssctl on</code>; <code>zssctl status</code> shows it as <code>waiting=</code>.</li>
+        </ul>
+        <p>A card switched off by the idle timer is different: it isn't hidden, and it comes back for anyone who asks.</p>
+
+        <h3 id="really-off">Is it really off?</h3>
+        <p><code>lspci</code> keeps listing the card, because the kernel keeps its entry for a card that can't be removed. Ask the card itself:</p>
+        <pre><code>lspci -x -s 01:00.0 | head -3     <span class="c"># all "ff": no power. Real bytes: it is on</span></code></pre>
+
+        <h3 id="frozen">Programs that can't be moved</h3>
+        <p>A program that uses the card but wasn't started under ZSS_AirLock (a monitor such as <code>btop</code>, say) can't be moved. <code>zssctl off</code> freezes it and <code>zssctl on</code> lets it carry on; the report names it.</p>
+        <ul>
+          <li>The terminal you type <code>zssctl off</code> into is never frozen. If it uses the card, the command says so and stops.</li>
+          <li>PID 1, the login manager and the rest of the system are never frozen.</li>
+          <li>If a frozen program is one you need to get back (a window manager), switch to another virtual terminal and run <code>zssctl on</code> there.</li>
+          <li><code>zssctl off --console</code> shows the report on a text console and keeps the screen there while the card is off. Press a key to power it on.</li>
+        </ul>
+
+        <h3 id="idle">Switching off when idle</h3>
+        <p>Set <code>idle_timeout</code> (seconds) in <code>/etc/zss/zssd.conf</code>. A card that drives a display is never powered off, and the timer never freezes anything: a program outside ZSS_AirLock keeps the card on.</p>
+        <p class="note">A monitor plugged in while the card is off isn't noticed until something asks about displays or you run <code>zssctl on</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="move">
+    <div class="wrap">
+      <div><p class="kicker">Use</p><h2>Moving programs by hand</h2><p class="sub">Move without touching the power.</p></div>
+      <div class="prose">
+        <pre><code>zssctl detach 0000:01:00.0                  <span class="c"># move every program off this GPU</span>
+zssctl detach 0000:01:00.0 --to 0000:00:02.0  <span class="c"># ... to a chosen GPU</span>
+zssctl detach 0000:01:00.0 --to software    <span class="c"># ... to the CPU renderer (if allowed)</span>
+zssctl attach 0000:01:00.0                  <span class="c"># bring back every program that started there</span>
+zssctl resume PID                           <span class="c"># resume a parked program on a suitable GPU</span>
+zssctl monitor                              <span class="c"># follow the daemon's events</span></code></pre>
+        <p>A program that can't go anywhere suitable is <b>parked</b>: it waits, with its state kept, until <code>zssctl resume</code> or until its GPU comes back. A program is only resumed on the CPU renderer if <code>allow_software = yes</code>.</p>
+        <h3>Trying it without the service</h3>
+        <p>A private daemon with the <code>dry-run</code> backend really moves programs between GPUs but never touches the card's power or driver. This is how the moving tests run.</p>
+        <pre><code><span class="c"># terminal 1</span>
+zssd --socket "$XDG_RUNTIME_DIR/zss.sock" --gpu 0000:01:00.0=dry-run --allow-software
+<span class="c"># terminal 2</span>
+export ZSS_SOCKET="$XDG_RUNTIME_DIR/zss.sock"
+zss-run vkcube &amp;
+zssctl detach 0000:01:00.0
+zssctl attach 0000:01:00.0</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="battery">
+    <div class="wrap">
+      <div><p class="kicker">Use</p><h2>On battery</h2><p class="sub">The card follows the charger.</p></div>
+      <div class="prose">
+        <pre><code>zss-power-event battery     <span class="c"># switch the dedicated GPU off, moving its programs</span>
+zss-power-event ac          <span class="c"># switch it back on and return them</span>
+zss-power-event battery --dry-run   <span class="c"># show the progress dialog, switch nothing</span></code></pre>
+        <ul>
+          <li>Progress (“Moving application 2 of 3”) appears in <code>zrn-warning-dialog</code> when that is installed.</li>
+          <li><code>ac</code> only switches the card back on if it was the battery event that switched it off. A card switched off by hand stays off.</li>
+          <li>The performance manager <code>zrn_perfd</code> calls it on every charger change once it is installed at <code>/usr/local/sbin/zss-power-event</code>. Any other power manager can call it the same way.</li>
+          <li>While programs are being moved, the daemon creates <code>/run/zss/moving</code>. A power manager that pauses background programs should leave them running while that file exists: a paused program can't answer the request to move.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="lend">
+    <div class="wrap">
+      <div><p class="kicker">Use</p><h2>Lending to a virtual machine</h2><p class="sub">GPU passthrough without a reboot or a log-out.</p></div>
+      <div class="prose">
+        <p>ZSS does the host's side. It moves programs off the card, gives the card to <code>vfio-pci</code>, and leaves it alone while a guest has it. On the way back it resets the card with a power cycle and returns it to the host's driver, with its programs.</p>
+        <pre><code>zssctl lend --check 0000:01:00.0     <span class="c"># what stands in the way, and what would be affected; changes nothing</span>
+zssctl lend 0000:01:00.0             <span class="c"># programs moved away, card handed to vfio-pci</span>
+zssctl status                        <span class="c"># state=lent, and the process holding the card</span>
+zssctl reclaim 0000:01:00.0          <span class="c"># power cycle, host driver back, programs returned</span>
+zssctl reclaim 0000:01:00.0 --stay   <span class="c"># the same, leaving programs where they are</span></code></pre>
+
+        <h3 id="lend-needs">What a machine needs</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Requirement</th><th scope="col">How to check</th></tr></thead>
+          <tbody>
+            <tr><td>An IOMMU, switched on (<code>intel_iommu=on</code> or <code>amd_iommu=on</code> on the kernel command line)</td><td><code>ls /sys/kernel/iommu_groups</code> isn't empty</td></tr>
+            <tr><td>The card alone in its isolation group (bridges don't count), or <code>--with-group</code></td><td><code>zssctl lend --check PCI</code></td></tr>
+            <tr><td>The display server doesn't have the card open</td><td><code>zssctl status</code> lists no display server for it</td></tr>
+            <tr><td>ZSS_Interceptor manages the card (it resets the card on return)</td><td><code>zssctl status</code> shows <code>backend=zss-kmod</code></td></tr>
+            <tr><td>Another display device on the host, if the card drives a monitor</td><td><code>zssctl lend --check PCI</code></td></tr>
+          </tbody>
+        </table></div>
+        <p><code>zssctl lend --check</code> reports all of these at once, each with what would remove it. <code>--json</code> gives the same as one document. <code>sh zss-installer.run --vm-passthrough</code> adds the udev rule that keeps X and the login manager off the card's display nodes (they open every display node of their seat at start-up, even for a card they don't use).</p>
+
+        <h3 id="with-group">Shared isolation groups</h3>
+        <p><code>--with-group</code> hands over the other devices in the card's isolation group with it. They have no host driver while the card is lent, and get it back on reclaim. On the reference laptop that is the Thunderbolt controller, so there's no Thunderbolt on the host while the card is lent. Without the option, such a device is an obstacle.</p>
+
+        <h3 id="lend-steps">What lending does</h3>
+        <ol class="steps">
+          <li><span>Moves every program under ZSS_AirLock off the card. A program that has the card open and wasn't started under ZSS blocks the lend: freezing it wouldn't help, because it would still hold the card.</span></li>
+          <li><span>Unloads the kernel modules stacked on the card's driver (for NVIDIA: <code>nvidia_uvm</code>, <code>nvidia_drm</code>, <code>nvidia_modeset</code>). It waits up to ten seconds for their users to go, then requires the driver to have no users left. A driver told to let go of a card still in use waits forever, so instead the lend is refused and undone.</span></li>
+          <li><span>Unbinds the card's functions from their drivers, with a 15-second limit so that a stuck driver can't take the daemon with it, and binds them to <code>vfio-pci</code>.</span></li>
+          <li><span>Marks the card lent. ZSS no longer watches, wakes or powers it, and refuses <code>off</code>, <code>on</code>, <code>detach</code> and <code>attach</code> for it.</span></li>
+        </ol>
+        <p>Reclaim is refused while a virtual machine holds the card; ZSS never stops a virtual machine. A card that is off is switched on first: <code>zssctl on PCI --stay</code>, then <code>zssctl lend PCI</code>.</p>
+
+        <h3 id="qemu">Starting a guest</h3>
+        <p>Once the card is lent, any passthrough setup works. With QEMU, for a card whose functions are <code>01:00.0</code> and <code>01:00.1</code>:</p>
+        <pre><code>qemu-system-x86_64 -machine q35,accel=kvm -cpu host -m 4G \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2-ovmf/x64/OVMF_CODE.4m.fd \
+  -device vfio-pci,host=01:00.0,multifunction=on -device vfio-pci,host=01:00.1 \
+  -display gtk ...</code></pre>
+        <p>With libvirt, add the two functions as host devices with <code>managed='no'</code>: ZSS has already bound them, and libvirt mustn't rebind them itself.</p>
+
+        <h3 id="lend-mbp">On the reference laptop</h3>
+        <ul>
+          <li><b>IOMMU.</b> A boot entry of its own adds <code>intel_iommu=on iommu=pt</code>. It isn't the default; it's chosen at the boot menu.</li>
+          <li><b>X server.</b> The NVIDIA card is out of the X configuration altogether, and the udev rule puts its display nodes on a seat of their own. Frames drawn on it reach the screen through ZSS_AirLock's presenter. The cost: no PRIME offload through X, and nothing on the outputs wired to the NVIDIA card (the external port) for now.</li>
+          <li><b>Interrupts.</b> The firmware's interrupt-remapping table is broken (“ioapic 2 has no mapping iommu”), so <code>vfio</code> refuses a group until told to allow unsafe interrupts. For one run: <code>echo Y | sudo tee /sys/module/vfio_iommu_type1/parameters/allow_unsafe_interrupts</code>, and <code>N</code> afterwards. This is acceptable for a guest you trust, not for one you don't.</li>
+          <li><b>Display.</b> Arch's <code>qemu-base</code> has no window; install <code>qemu-ui-gtk</code> for <code>-display gtk</code>. The “Mac Edition” card has no option ROM, so QEMU warns and the guest's boot display is QEMU's emulated card.</li>
+          <li><b>Result, 9 October 2026:</b> lent in 2.9 s, used by a QEMU guest running a CachyOS live image, reclaimed in 11.2 s after the guest shut down, with the desktop and its programs running throughout.</li>
+        </ul>
+
+        <h3>Not done yet</h3>
+        <ul>
+          <li>Lending a card straight from “off”.</li>
+          <li>Taking the card back automatically when the virtual machine exits (a libvirt hook could call <code>zssctl reclaim</code>).</li>
+          <li>Charger events while lent: the power-off they ask for is refused, so the card simply stays lent.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="loss">
+    <div class="wrap">
+      <div><p class="kicker">Use</p><h2>When a card is lost</h2><p class="sub">The case ZSS exists for, and the one least finished.</p></div>
+      <div class="prose">
+        <p>A card that stops answering, or leaves the bus, is noticed by ZSS_Interceptor within about a tenth of a second. It is marked disconnected, and its driver is told through the kernel's PCI error-recovery handlers if it has them, or frozen if it is the patched NVIDIA driver. What follows depends on whether the card was in use. Here is what happened in four real power cuts on the reference laptop:</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">The card was</th><th scope="col">The desktop</th><th scope="col">Programs on the card</th><th scope="col">Getting the card back</th></tr></thead>
+          <tbody>
+            <tr><td>Idle</td><td>Carries on</td><td>None</td><td><code>zssctl on</code>: power, PCI state and driver restored, no reboot</td></tr>
+            <tr><td>Being rendered on</td><td>Carries on</td><td>Stuck: frozen out of the driver, not moved</td><td><b>A reboot.</b> <code>zssctl on</code> refuses while stuck programs hold the card</td></tr>
+          </tbody>
+        </table></div>
+        <pre><code>zssctl status                 <span class="c"># state=lost, driver=frozen</span>
+zssctl on 0000:01:00.0        <span class="c"># tries to restore power, then resumes the driver</span></code></pre>
+        <h3>Why the busy case fails</h3>
+        <p>A program that is rendering calls into the driver many times in the tenth of a second it takes to notice the loss, so the driver finds out first. Once the driver is frozen, the program's calls sleep, so ZSS_AirLock can't move it. Resuming the driver under a program whose state on the card is gone hung the machine in testing, which is why the daemon now refuses to do it.</p>
+        <h3>The <code>loss_while_busy</code> setting</h3>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Value</th><th scope="col">What happens when the card vanishes while in use</th></tr></thead>
+          <tbody>
+            <tr><td class="k"><code>leave</code> (default)</td><td>The driver finds out for itself. Programs get errors and are moved, the display server carries on, and the card stays unusable until the driver is reloaded (for NVIDIA: until you log out).</td></tr>
+            <tr><td class="k"><code>refuse</code></td><td>The driver is frozen and turns callers away at once. Programs are moved, the display server isn't held, and the driver can still be given the card back. Needs patch revision 5; not yet proven on hardware.</td></tr>
+            <tr><td class="k"><code>freeze</code></td><td>The driver is frozen and callers wait: the display server stops.</td></tr>
+          </tbody>
+        </table></div>
+        <p>When the card is idle the driver is always frozen, which is what lets it come back without a reboot. Programs under ZSS_AirLock on a lost card are rebuilt on another GPU from what ZSS_AirLock kept in memory (see <code>ZSS_RETAIN</code>), or parked.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="testing">
+    <div class="wrap">
+      <div><p class="kicker">Use</p><h2>Helping test it</h2><p class="sub">Every other machine teaches us something.</p></div>
+      <div class="prose">
+        <pre><code>curl -fsSLO https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend/releases/latest/download/zss-tester.run &amp;&amp; sh zss-tester.run</code></pre>
+        <p>With PySide6 or PyQt6 installed and a desktop running, it opens a window. Otherwise it runs in the terminal (<code>--mail</code> opens your mail program at the end). It needs Python 3. It takes a few minutes, and it does three things:</p>
+        <ol class="steps">
+          <li><span><b>Collects facts</b>: the graphics cards and their drivers, how their power can be switched, the IOMMU, what Vulkan and OpenGL see, the display server, and graphics-related kernel messages.</span></li>
+          <li><span><b>Runs the moving tests</b>: test programs are moved between your graphics cards and back, and what they draw is compared. A few test windows appear briefly. It uses a test daemon in dry-run mode, so <b>no card is switched off and no driver is touched.</b></span></li>
+          <li><span><b>Saves the report</b> as a folder and a <code>.tar.gz</code> file in your home folder.</span></li>
+        </ol>
+        <p>It changes nothing, installs nothing and sends nothing by itself. Before anything is saved, your computer's name, your user name and home folder, disk identifiers, serial numbers, network addresses and email addresses are replaced by placeholders.</p>
+        <p><b>Send report</b> opens your mail program addressed to the author with a summary filled in. Attach the <code>.tar.gz</code> (its path is copied for you) and send.</p>
+        <h3>The full test (optional)</h3>
+        <p><b>Run full test</b> goes further and does change your computer. It builds and installs ZSS with its kernel module (your graphics driver isn't patched), runs the whole test suite, and switches your discrete card off and on once. It asks for your password and shows every command first. Save your work before running it.</p>
+        <p>It builds from source, so it is offered when the kit runs from a checkout of the repository rather than from the download:</p>
+        <pre><code>git clone https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend
+cd ZrnSelectiveSuspend
+tester/zss-report-gui                <span class="c"># or tester/zss-report --full-test in a terminal</span>
+sudo ./packaging/uninstall.sh        <span class="c"># removes it again afterwards</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== HOW IT WORKS ============================== -->
+  <section class="section" id="architecture">
+    <div class="wrap">
+      <div><p class="kicker">How it works</p><h2>The three parts</h2><p class="sub">A user-space shim, a daemon and a kernel shim, around the GPU's own driver.</p></div>
+      <div class="prose">
+        <figure class="diagram">
+          <svg class="dia" viewBox="0 0 760 500" role="img" aria-labelledby="arch-title">
+            <title id="arch-title">ZSS architecture: programs draw through ZSS_AirLock onto the real drivers; zssd sequences moves and power through ZSS_Interceptor in the kernel.</title>
+            <text class="m" x="20" y="22">USER SPACE</text>
+            <rect x="20" y="34" width="520" height="54"/>
+            <text x="36" y="58">Programs: Vulkan · OpenGL through Zink · Chromium / Electron · Unity</text>
+            <text class="m" x="36" y="77">started by zss-run, or by the launch router</text>
+            <path d="M280 88 V114"/><path d="M274 108 L280 114 L286 108"/>
+            <rect class="solid" x="20" y="114" width="520" height="92"/>
+            <text class="inv t" x="36" y="140">ZSS_AirLock</text>
+            <text class="inv" x="148" y="140" style="font-size:12.5px">libzss_airlock.so</text>
+            <text class="inv" x="36" y="164" style="font-size:13px">owns every handle · records command buffers · shadows memory</text>
+            <text class="inv" x="36" y="184" style="font-size:13px">rebuilds a program on another GPU · presents on the screen's GPU</text>
+            <path d="M100 206 V236 M280 206 V236 M470 206 V236"/>
+            <path d="M94 230 L100 236 L106 230 M274 230 L280 236 L286 230 M464 230 L470 236 L476 230"/>
+            <rect x="20" y="236" width="160" height="44"/><text x="36" y="263">NVIDIA Vulkan</text>
+            <rect x="195" y="236" width="190" height="44"/><text x="211" y="263">Mesa: Intel, AMD, …</text>
+            <rect x="400" y="236" width="140" height="44"/><text x="416" y="263">llvmpipe (CPU)</text>
+            <rect x="580" y="34" width="160" height="54"/>
+            <text x="596" y="58">zssctl</text><text class="m" x="596" y="77">zss-power-event</text>
+            <path d="M660 88 V114"/><path d="M654 108 L660 114 L666 108"/>
+            <rect x="580" y="114" width="160" height="92"/>
+            <text class="t" x="596" y="140">zssd</text>
+            <text class="m" x="596" y="162">who holds the GPU</text>
+            <text class="m" x="596" y="180">move · freeze · off · on</text>
+            <text class="m" x="596" y="198">lend · reclaim</text>
+            <path d="M540 160 H580"/>
+            <text class="m" x="544" y="152" style="font-size:11px">socket</text>
+            <line class="dash" x1="20" y1="318" x2="740" y2="318"/>
+            <text class="m" x="20" y="340">KERNEL</text>
+            <path d="M660 206 V352"/><path d="M654 346 L660 352 L666 346"/>
+            <text class="m" x="652" y="300" text-anchor="end" style="font-size:11px">/sys/kernel/zss/…/power</text>
+            <rect x="20" y="352" width="720" height="60"/>
+            <text class="t" x="36" y="377">ZSS_Interceptor</text>
+            <text class="m" x="168" y="377">zss.ko</text>
+            <text class="m" x="36" y="399">quiesce the driver · save / restore PCI state · power backends: gmux, acpi · loss guard · lent</text>
+            <path d="M380 412 V438"/><path d="M374 432 L380 438 L386 432"/>
+            <rect x="20" y="438" width="720" height="44"/>
+            <text x="36" y="465">GPU driver: nvidia (with the patch) · amdgpu · i915 · xe · nouveau   —   or vfio-pci while lent</text>
+          </svg>
+          <figcaption>Programs never talk to ZSS directly: they see ZSS_AirLock as their Vulkan driver.</figcaption>
+        </figure>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Part</th><th scope="col">What it is</th><th scope="col">Its job</th></tr></thead>
+          <tbody>
+            <tr><td class="k"><b>ZSS_AirLock</b></td><td>User-space Vulkan driver shim, <code>libzss_airlock.so</code>, started with <code>zss-run</code>. Messages begin <code>[ZSS_AirLock]</code></td><td>Keeps enough state to rebuild a program on another GPU, and does so when asked or when the GPU is lost</td></tr>
+            <tr><td class="k"><b>zssd</b></td><td>The daemon, a system service</td><td>Decides and sequences: who is using the GPU, what to move, freeze or stop; then driver suspend and the power cut, and the reverse; and lending</td></tr>
+            <tr><td class="k"><b>ZSS_Interceptor</b></td><td>The kernel shim, <code>zss.ko</code> (its file, <code>/sys</code> entries and kernel messages keep the name <code>zss</code>). Optional</td><td>The part that touches hardware: quiesces the driver, saves and restores PCI state, cuts and restores power, watches for a card that goes silent</td></tr>
+            <tr><td class="k"><b>The NVIDIA patch</b></td><td>A small patch to NVIDIA's driver, applied on your machine</td><td>Lets the driver sleep under a running display server and be frozen when its card vanishes</td></tr>
+          </tbody>
+        </table></div>
+        <p>The original design put everything in the kernel and shielded a running driver from a vanishing card by shadowing its registers. What was built instead moves programs off the card first, then powers it off with the driver's own cooperation. That needs far less from the kernel, and it works on real hardware today.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="airlock">
+    <div class="wrap">
+      <div><p class="kicker">How it works</p><h2>ZSS_AirLock</h2><p class="sub">The program's Vulkan driver, with the real drivers underneath.</p></div>
+      <div class="prose">
+        <p>A program started under ZSS_AirLock gets it as its only Vulkan driver. ZSS_AirLock loads the real drivers itself and hands out handles of its own. Because it stands between the program and the GPU for every call, it can take a program's work off one GPU and put it on another without the program noticing.</p>
+        <h3>What it keeps</h3>
+        <ul>
+          <li><b>Every object the program creates</b>: devices, buffers, images, pipelines, descriptor sets, swapchains. Each is a handle of ZSS_AirLock's own, backed by an object on the real GPU that can be replaced.</li>
+          <li><b>Command buffers</b>, recorded in its own form and replayed onto the real GPU, so they can be replayed again on another one.</li>
+          <li><b>Memory the CPU can see</b>, shadowed, so its contents survive a move.</li>
+          <li><b>Uploaded textures</b>, kept on disk (or in RAM) so that a program can be rebuilt even after its GPU vanished without warning (<code>ZSS_RETAIN</code>).</li>
+        </ul>
+        <h3>A move, step by step</h3>
+        <ol class="steps">
+          <li><span>The daemon asks the program, over its control socket, to move off a GPU.</span></li>
+          <li><span>ZSS_AirLock holds the program's calls at the door, waits for the GPU to finish, and reads back what lives only on the GPU: images, buffers, the window's current picture.</span></li>
+          <li><span>It creates each object again on the new GPU, uploads the contents, and replays the recorded command buffers.</span></li>
+          <li><span>It rebuilds the window's swapchain in place, keeping its images' contents, so that a program which redraws only what changed (Chromium does) still shows the whole picture.</span></li>
+          <li><span>It lets the program's calls through again. The program never received an error; it just carries on, on another GPU.</span></li>
+        </ol>
+        <h3>The portable profile</h3>
+        <p>A program is offered Vulkan 1.1 with the features and limits that every GPU it might move to has, including the number of queues. Nothing it enables can then hold it to one card. <code>ZSS_PROFILE=native</code> switches this off.</p>
+        <h3>Standing in for missing features</h3>
+        <p>Some extensions are offered on every GPU and emulated where a driver lacks them. Dynamic rendering is lowered to cached render passes and framebuffers. <code>VK_KHR_maintenance5</code> is mapped onto older calls. That is what lets Zink, and so OpenGL, run on the NVIDIA 470 driver. Also offered: timeline semaphores, extended dynamic state, robustness2, conditional rendering, custom border colours, line rasterisation, transform feedback, sampler Y′CbCr conversion and more.</p>
+        <h3 id="presenter">Presenting on the screen's GPU</h3>
+        <p>A program may draw on one GPU while another drives the screen. Mesa's drivers hand frames across in order themselves. The NVIDIA proprietary driver only does that when the X server has its card. Without that, ZSS_AirLock does it:</p>
+        <ul>
+          <li>It gives the program ordinary images on its own GPU.</li>
+          <li>It keeps the window's real swapchain on a small device of its own on the screen's GPU.</li>
+          <li>At each present it reads the frame back, waits for it, copies it in, and presents it there, in order.</li>
+        </ul>
+        <p>This is what fixed text that flickered back to the previous frame while typing in Chromium-based apps. Moves switch between this and direct presenting. <code>ZSS_PRESENT=direct</code> turns it off; <code>copy</code> forces it on.</p>
+        <h3>Housekeeping</h3>
+        <ul>
+          <li>Frames for a swapchain the program has already replaced are dropped instead of presented. This stops a hang on NVIDIA when Zink changes the swap interval.</li>
+          <li>When a real driver is closed, ZSS_AirLock closes the render node that NVIDIA's driver leaks, so that a moved program doesn't keep the card busy.</li>
+          <li>ZSS_AirLock is linked so that it can't be unloaded, because Chromium unloads its Vulkan driver between probes.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="daemon">
+    <div class="wrap">
+      <div><p class="kicker">How it works</p><h2>The daemon</h2><p class="sub"><code>zssd</code> decides and sequences.</p></div>
+      <div class="prose">
+        <h3>Switching off, in seven steps</h3>
+        <ol class="steps">
+          <li><span><b>Who holds the card.</b> Every process with one of the card's device nodes open is found and classed: display server, program under ZSS_AirLock, guest, system process, other.</span></li>
+          <li><span><b>Move.</b> Each program under ZSS_AirLock is asked to move to another GPU (<code>default_target</code>, or the best one available). One that can't go anywhere is parked.</span></li>
+          <li><span><b>Stop and freeze.</b> Services listed in <code>stop_services</code> are stopped; other processes still holding the card are frozen, except system processes, the login manager and the terminal running <code>zssctl</code>. The card's device nodes are hidden from new programs.</span></li>
+          <li><span><b>PCI state</b> is saved, in the kernel if ZSS_Interceptor is loaded.</span></li>
+          <li><span><b>Driver suspended</b> through its own sleep code.</span></li>
+          <li><span><b>Power cut</b> through the backend: the gmux on the reference laptop.</span></li>
+          <li><span><b>Watching</b> for wake requests: a display-server call is served by powering the card for a moment.</span></li>
+        </ol>
+        <p>Switching on runs the same steps backwards, and returns each program to the GPU it started on unless <code>--stay</code> is given.</p>
+        <h3>Rules it keeps</h3>
+        <ul>
+          <li>A card driving a display isn't switched off by the timer.</li>
+          <li>PID 1, the login manager and other system processes are never frozen.</li>
+          <li>While programs are moving it writes <code>/run/zss/moving</code>, so that power managers don't pause them mid-move.</li>
+          <li>Lending is refused, rather than risked, whenever the driver couldn't let go cleanly.</li>
+          <li>Its state survives a restart: a lent card is still known as lent.</li>
+        </ul>
+        <h3>Who may ask</h3>
+        <p><code>zssctl</code> talks to the daemon over a Unix socket (<code>/run/zss/zssd.sock</code>). Moving, switching and lending are allowed for root, members of the <code>zss</code> group, and the user the daemon runs as. Status is open to everyone. The wire protocol is in <code>docs/protocol.md</code> in the repository.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="interceptor">
+    <div class="wrap">
+      <div><p class="kicker">How it works</p><h2>ZSS_Interceptor</h2><p class="sub">The kernel shim: the part that touches the hardware.</p></div>
+      <div class="prose">
+        <p>Loaded, it does nothing until the daemon hands it a device. The daemon drives it through one file per device:</p>
+        <pre><code>/sys/kernel/zss/0000:01:00.0/power     <span class="c"># off · on · lend · unlend · reclaim</span></code></pre>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Duty</th><th scope="col">How</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Quiesce the driver</td><td>Runs the driver's own runtime sleep and wake code (<code>quiesce=pm</code>), which also re-runs the card's firmware after power returns. For NVIDIA, the daemon suspends the driver through <code>/proc/driver/nvidia/suspend</code>.</td></tr>
+            <tr><td class="k">PCI state</td><td>Saved before the cut and restored after, by the PCI core. Bus mastering is switched off before the power goes.</td></tr>
+            <tr><td class="k">Power</td><td>Through a backend: <code>gmux</code> (Apple, port <code>0x750</code>, verified), <code>acpi</code> (firmware power resources, written, never run), <code>test</code>. A hot-plug-slot backend lives in the daemon.</td></tr>
+            <tr><td class="k">Power on</td><td>Power, a bounded wait for the card to answer, state restore, then the driver's resume. A card with no driver is refused: ZSS doesn't run a card's video BIOS itself.</td></tr>
+            <tr><td class="k">Loss guard</td><td>Notices a card that has gone silent or left the bus, marks it disconnected, and tells its driver through PCI error handlers, or freezes the patched NVIDIA driver.</td></tr>
+            <tr><td class="k">Lent</td><td>Hands off entirely while a card is lent. On reclaim it power-cycles the card and restores its PCI state; it refuses while any function still has a driver.</td></tr>
+            <tr><td class="k">System sleep</td><td>Pauses across suspend and resume of the whole machine.</td></tr>
+            <tr><td class="k">IOMMU</td><td>Reports whether an IOMMU confines the card's memory access (<code>iommu=</code> in <code>zssctl status</code>). It adds no confinement of its own.</td></tr>
+          </tbody>
+        </table></div>
+        <p>It is built through DKMS and loaded when <code>zssd</code> starts, never from the initial ramdisk. <code>rmmod zss</code>, with the daemon stopped, takes it out. Without it, the daemon does a narrower version of the same from user space (NVIDIA and gmux only), and lending isn't available.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="patch">
+    <div class="wrap">
+      <div><p class="kicker">How it works</p><h2>The NVIDIA patch</h2><p class="sub">Needed only for power-off with NVIDIA's proprietary driver.</p></div>
+      <div class="prose">
+        <p>NVIDIA's driver isn't built to have its card switched off under a running display server. The patch adds two things:</p>
+        <ul>
+          <li><b>Wake on touch.</b> A caller arriving while the driver is suspended asks for a wake and sleeps, instead of spinning forever. That is how the display server can borrow a switched-off card for a moment.</li>
+          <li><b>Freeze.</b> The driver can be shut to every caller without anything being asked of the card, for the moment a card vanishes, and resumed when the card is back. Revision 5 can also turn callers away at once instead of making them wait (<code>loss_while_busy = refuse</code>).</li>
+        </ul>
+        <pre><code>zss-nvidia-patch status     <span class="c"># driver version, whether it's validated, whether the patch is in</span>
+zss-nvidia-patch apply
+zss-nvidia-patch remove     <span class="c"># put the stock driver back</span></code></pre>
+        <ul>
+          <li>Validated against <b>470.256.02</b> so far (revision 5). The installer offers it only for a validated version.</li>
+          <li>It is applied through DKMS on your machine, to the copy of the driver you installed, so it follows kernel updates. A pacman hook re-applies it after a driver update.</li>
+          <li>The stock modules are kept, and restored at boot if the patched driver doesn't load.</li>
+          <li>ZSS doesn't ship or modify NVIDIA's driver itself. The lines the patch adds are under the MIT licence so that they can be built into NVIDIA's driver.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="states">
+    <div class="wrap">
+      <div><p class="kicker">How it works</p><h2>Device states</h2><p class="sub">What <code>zssctl status</code> reports for a managed card.</p></div>
+      <div class="prose">
+        <figure class="diagram">
+          <svg class="dia" viewBox="0 0 760 380" role="img" aria-labelledby="states-title">
+            <title id="states-title">Device states: attached goes to powered-off and back, to lost when the card stops answering and back with zssctl on, and to lent and back with reclaim.</title>
+            <rect class="solid" x="40" y="50" width="160" height="56"/>
+            <text class="inv t" x="58" y="84">attached</text>
+            <rect x="520" y="50" width="180" height="56"/>
+            <text class="t" x="538" y="76">powered-off</text>
+            <text class="m" x="538" y="96">0 W</text>
+            <path d="M200 66 H520"/><path d="M513 61 L520 66 L513 71"/>
+            <text class="m" x="215" y="58">detaching: zssctl off · idle timer · on battery</text>
+            <path d="M520 92 H200"/><path d="M207 87 L200 92 L207 97"/>
+            <text class="m" x="215" y="124">attaching: zssctl on · wake request · charger</text>
+            <path d="M700 66 H730 V92 H700"/><path d="M707 87 L700 92 L707 97"/>
+            <text class="m" x="520" y="128">the display server calls: powered</text>
+            <text class="m" x="520" y="144">for a moment, then off again</text>
+            <rect x="470" y="175" width="130" height="50"/>
+            <text class="t" x="488" y="206">lost</text>
+            <path d="M185 106 V188 H470"/><path d="M463 183 L470 188 L463 193"/>
+            <text class="m" x="196" y="180">card stops answering, or leaves the bus</text>
+            <path d="M470 212 H165 V106"/><path d="M160 113 L165 106 L170 113"/>
+            <text class="m" x="196" y="232">zssctl on, or the card answers again</text>
+            <rect x="40" y="300" width="160" height="50"/>
+            <text class="t" x="58" y="331">lent</text>
+            <path d="M80 106 V300"/><path d="M75 293 L80 300 L85 293"/>
+            <text class="m" x="72" y="262" text-anchor="end">lend</text>
+            <path d="M130 300 V106"/><path d="M125 113 L130 106 L135 113"/>
+            <text class="m" x="140" y="282">reclaim: power cycle, host drivers back, programs returned</text>
+            <text class="m" x="215" y="322">card on vfio-pci, owned by a virtual machine;</text>
+            <text class="m" x="215" y="340">ZSS doesn't watch, wake or power it</text>
+          </svg>
+          <figcaption>Detaching and attaching are the moments in between, while programs are moved.</figcaption>
+        </figure>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">State</th><th scope="col">Card power</th><th scope="col">Host driver</th><th scope="col">Programs that were on it</th><th scope="col">Display server</th></tr></thead>
+          <tbody>
+            <tr><td class="k"><b>attached</b></td><td>On</td><td>Bound</td><td>Running on it</td><td>May use it</td></tr>
+            <tr><td class="k"><b>powered-off</b></td><td>Off (0 W)</td><td>Suspended</td><td>Moved to another GPU, or frozen</td><td>Served on demand (patched NVIDIA driver)</td></tr>
+            <tr><td class="k"><b>lost</b></td><td>Unknown</td><td>Frozen, or told through its error handlers</td><td>Rebuilt on another GPU, or parked</td><td>Carries on</td></tr>
+            <tr><td class="k"><b>lent</b></td><td>On</td><td>None (<code>vfio-pci</code>)</td><td>Moved to another GPU</td><td>Mustn't hold the card</td></tr>
+            <tr><td class="k">detaching, attaching</td><td>Changing</td><td>Changing</td><td>Being moved</td><td>—</td></tr>
+          </tbody>
+        </table></div>
+        <p><code>zssctl status</code> also shows counters: <code>wakes</code> (times woken by a request), <code>served</code> and <code>serving</code> (powered briefly for the display server), <code>waiting</code> (programs asleep on the driver), <code>driver_frozen</code>, <code>iommu</code>, and the seconds left on the idle timer.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== REFERENCE ============================== -->
+  <section class="section" id="zssctl">
+    <div class="wrap">
+      <div><p class="kicker">Reference</p><h2>zssctl</h2><p class="sub">The control tool. <code>PCI</code> is an address such as <code>0000:01:00.0</code>.</p></div>
+      <div class="prose">
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Command</th><th scope="col">What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="k"><code>status [PCI]</code></td><td>State of each managed card, its backend, wake support, who is using it, and the counters.</td></tr>
+            <tr><td class="k"><code>off PCI [--to PCI|software] [--console]</code></td><td>Move programs away, stop and freeze the rest, suspend the driver, cut power. <code>--console</code> shows it on a text console and waits for a key to power back on.</td></tr>
+            <tr><td class="k"><code>on PCI [--stay]</code></td><td>Restore power, PCI state and the driver; return programs unless <code>--stay</code>.</td></tr>
+            <tr><td class="k"><code>detach PCI [--to PCI|software]</code></td><td>Move programs off the card; leave its power alone.</td></tr>
+            <tr><td class="k"><code>attach PCI</code></td><td>Bring back the programs that started on the card.</td></tr>
+            <tr><td class="k"><code>lend --check PCI [--with-group] [--json]</code></td><td>Say what stands in the way of lending and what would be affected. Changes nothing.</td></tr>
+            <tr><td class="k"><code>lend PCI [--with-group] [--to PCI|software]</code></td><td>Hand the card to a virtual machine through <code>vfio-pci</code>.</td></tr>
+            <tr><td class="k"><code>reclaim PCI [--stay]</code></td><td>Take a lent card back: power cycle, host drivers, programs.</td></tr>
+            <tr><td class="k"><code>resume PID</code></td><td>Resume a parked program on a suitable GPU.</td></tr>
+            <tr><td class="k"><code>monitor</code></td><td>Print the daemon's events as they happen.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="zss-run">
+    <div class="wrap">
+      <div><p class="kicker">Reference</p><h2>zss-run</h2><p class="sub"><code>zss-run [options] program [args…]</code></p></div>
+      <div class="prose">
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Option</th><th scope="col">Effect</th></tr></thead>
+          <tbody>
+            <tr><td class="k"><i>(none)</i></td><td>Start the program under ZSS_AirLock on the dedicated GPU. The other GPUs aren't listed to it, but it can still be moved to them.</td></tr>
+            <tr><td class="k"><code>--on GPU</code></td><td>Start on another GPU: a PCI address, part of a GPU's name, <code>dedicated</code>, or <code>any</code>.</td></tr>
+            <tr><td class="k"><code>--gl</code></td><td>Run an OpenGL program through Mesa's Zink, so that it can be moved too.</td></tr>
+            <tr><td class="k"><code>--plain</code></td><td>Don't add the Chromium switches.</td></tr>
+            <tr><td class="k"><code>--print</code></td><td>Show what would be run, and run nothing.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="config">
+    <div class="wrap">
+      <div><p class="kicker">Reference</p><h2>Configuration</h2><p class="sub"><code>/etc/zss/zssd.conf</code>. Restart the service after editing.</p></div>
+      <div class="prose">
+        <p>Every setting can also be given on the daemon's command line as <code>--name-with-dashes</code>.</p>
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Setting</th><th scope="col">Meaning</th><th scope="col">Default</th></tr></thead>
+          <tbody>
+            <tr><td class="k"><code>gpu</code></td><td>The card to manage, by PCI address. The backend is detected; force one with <code>PCI=apple-gmux</code>, <code>PCI=pciehp-slot</code> or <code>PCI=dry-run</code>. May be repeated.</td><td>Set by the installer</td></tr>
+            <tr><td class="k"><code>idle_timeout</code></td><td>Power an unused card off after this many seconds.</td><td>Unset: only on request</td></tr>
+            <tr><td class="k"><code>stop_services</code></td><td>Services that hold the card only to keep it initialised; stopped before a power-off, started again after.</td><td><code>nvidia-persistenced</code></td></tr>
+            <tr><td class="k"><code>hide_while_off</code></td><td><code>auto</code> (device nodes and the vendor's files), <code>no</code>, or a comma-separated list of extra paths to hide.</td><td><code>auto</code></td></tr>
+            <tr><td class="k"><code>default_target</code></td><td>Where programs go when the card goes off: a PCI address or <code>software</code>.</td><td>Unset: the daemon picks</td></tr>
+            <tr><td class="k"><code>allow_software</code></td><td>Let programs fall back to the CPU renderer when no GPU suits them.</td><td><code>no</code></td></tr>
+            <tr><td class="k"><code>loss_while_busy</code></td><td><code>leave</code>, <code>refuse</code> or <code>freeze</code>; see <a href="#loss">When a card is lost</a>.</td><td><code>leave</code></td></tr>
+            <tr><td class="k"><code>group</code></td><td>Members of this group may switch cards off and on.</td><td><code>zss</code></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="env">
+    <div class="wrap">
+      <div><p class="kicker">Reference</p><h2>Environment variables</h2><p class="sub">Read by ZSS_AirLock in each program.</p></div>
+      <div class="prose">
+        <div class="table-scroll"><table>
+          <thead><tr><th scope="col">Variable</th><th scope="col">Effect</th></tr></thead>
+          <tbody>
+            <tr><td class="k"><code>ZSS_SOCKET</code></td><td>The daemon's socket (default <code>/run/zss/zssd.sock</code>).</td></tr>
+            <tr><td class="k"><code>ZSS_DEBUG</code></td><td>Log what is loaded and why a device isn't movable.</td></tr>
+            <tr><td class="k"><code>ZSS_START_ON</code></td><td>The GPU a program starts on: <code>dedicated</code>, a PCI address, part of a name, or <code>any</code>. <code>zss-run --on</code> sets it.</td></tr>
+            <tr><td class="k"><code>ZSS_PROFILE</code></td><td><code>portable</code> (default): what every GPU has. <code>native</code>: each GPU's own.</td></tr>
+            <tr><td class="k"><code>ZSS_PRESENT</code></td><td><code>direct</code>: every swapchain on the drawing GPU. <code>copy</code>: always through the screen's GPU. Default: through the screen's GPU only where needed.</td></tr>
+            <tr><td class="k"><code>ZSS_VULKAN</code></td><td><code>1.0</code> offers Vulkan 1.0 only.</td></tr>
+            <tr><td class="k"><code>ZSS_ALLOW_SOFTWARE</code></td><td>Let a parked program resume on the CPU renderer.</td></tr>
+            <tr><td class="k"><code>ZSS_RETAIN</code></td><td>Where uploaded textures are kept to survive a lost GPU: <code>disk</code> (default), <code>ram</code>, <code>off</code>.</td></tr>
+            <tr><td class="k"><code>ZSS_RETAIN_LIMIT_MB</code>, <code>ZSS_RETAIN_QUEUE_MB</code></td><td>Size cap of that store (4096) and of data waiting to be written (256).</td></tr>
+            <tr><td class="k"><code>ZSS_REAL_DRIVER_FILES</code></td><td>Colon-separated driver manifests to use instead of the system's.</td></tr>
+            <tr><td class="k"><code>ZSS_TRAP</code></td><td>Debugging: a Vulkan command ZSS_AirLock doesn't provide stops the program with that command's name.</td></tr>
+            <tr><td class="k"><code>ZSS_BIND_PCI</code></td><td>Test aid: the CPU renderer poses as the PCI device at that address.</td></tr>
+            <tr><td class="k"><code>ZSS_TEST_LOSE_AT_SUBMIT</code>, <code>ZSS_TEST_LOSE_AFTER_SUBMIT</code></td><td>Test aids: behave as if the GPU died at, or just after, that submit.</td></tr>
+            <tr><td class="k"><code>ZSS_TEST_STUCK_MS</code>, <code>ZSS_LOSS_GRACE_MS</code></td><td>Test aids: hold a thread inside ZSS_AirLock during a loss; how long recovery waits for such threads (3000).</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="build">
+    <div class="wrap">
+      <div><p class="kicker">Reference</p><h2>Building from source</h2><p class="sub">Meson and Ninja; the Vulkan headers are fetched at build time.</p></div>
+      <div class="prose">
+        <pre><code>git clone https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend
+cd ZrnSelectiveSuspend
+meson setup build &amp;&amp; ninja -C build
+meson test -C build                 <span class="c"># host and QEMU tests: nothing on this machine is powered off</span>
+./packaging/install.sh --check      <span class="c"># what this machine supports; changes nothing</span>
+sudo ./packaging/install.sh         <span class="c"># install</span></code></pre>
+        <p>On Arch the build needs <code>base-devel meson ninja python glslang vulkan-icd-loader vulkan-headers libxcb libx11 wayland libglvnd</code>, plus <code>linux-headers</code> for the kernel module. <code>packaging/make-bundle.sh VERSION DIR</code> makes the same <code>.run</code> files as a release.</p>
+        <h3>Where things are</h3>
+        <div class="table-scroll"><table>
+          <tbody>
+            <tr><td class="k"><code>src/layer/</code></td><td>ZSS_AirLock</td></tr>
+            <tr><td class="k"><code>src/daemon/</code></td><td><code>zssd</code>, the power backends, lending</td></tr>
+            <tr><td class="k"><code>src/zssctl/</code></td><td>The control tool</td></tr>
+            <tr><td class="k"><code>kmod/</code></td><td>ZSS_Interceptor and its DKMS files</td></tr>
+            <tr><td class="k"><code>patches/</code></td><td>The NVIDIA wake-on-touch patch</td></tr>
+            <tr><td class="k"><code>packaging/</code></td><td>Installer, service units, the patch tool, the Arch package, the bundle maker</td></tr>
+            <tr><td class="k"><code>tester/</code></td><td>The tester kit</td></tr>
+            <tr><td class="k"><code>tests/</code></td><td>Test programs, frame comparison, host, QEMU and hardware harnesses</td></tr>
+            <tr><td class="k"><code>docs/</code></td><td>Wire protocol, hardware results, lending, device loss</td></tr>
+            <tr><td class="k"><code>openspec/changes/</code></td><td>Proposal, design, specs and tasks for each milestone</td></tr>
+            <tr><td class="k"><code>SPEC.md</code></td><td>The long-term design, and what became of each part</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="trouble">
+    <div class="wrap">
+      <div><p class="kicker">Reference</p><h2>Troubleshooting</h2><p class="sub">Problems met on the reference laptop, and what fixes them.</p></div>
+      <div class="prose">
+        <dl class="qa">
+          <div><dt><code>zssctl</code> can't reach <code>zssd</code></dt><dd><p><code>sudo systemctl restart zssd</code>, then <code>journalctl -u zssd -b</code> if it still fails. Programs started before the restart don't register with the new daemon; restart them to make them movable again.</p></dd></div>
+          <div><dt>A program started from a terminal isn't moved</dt><dd><p>Only programs started under ZSS_AirLock can be moved. Start it with <code>zss-run</code> (or <code>zss-run --gl</code> for OpenGL), or turn on ZrnLaunchRouter so that everything you start is routed.</p></dd></div>
+          <div><dt><code>zssctl off</code> says a program still has the device open</dt><dd><p>That program uses the card but wasn't started under ZSS. Either it is frozen (and named in the report), or, for lending, it blocks the operation. Close it, or start it again with <code>zss-run</code>.</p></dd></div>
+          <div><dt>The terminal itself uses the card</dt><dd><p>The command refuses rather than freeze the terminal you typed into. Run it from a terminal that isn't on the card, or from a text console.</p></dd></div>
+          <div><dt>A program doesn't start under <code>zss-run</code></dt><dd><p>It probably needs Vulkan 1.2 or later. Run <code>ZSS_DEBUG=1 zss-run …</code> to see why; <code>ZSS_TRAP=1</code> names a Vulkan command it called that ZSS_AirLock doesn't provide. Run it without <code>zss-run</code> meanwhile.</p></dd></div>
+          <div><dt>A program fails to move to the integrated GPU</dt><dd><p>Usually memory: the target has less, and a game that fills the discrete card can't fit. The program is parked or keeps running where it was; the report says which.</p></dd></div>
+          <div><dt>A Chromium or Electron app draws on the CPU</dt><dd><p>It is missing the two Vulkan switches. <code>zss-run --print app</code> shows whether they are added. Without them it draws through OpenGL and isn't movable.</p></dd></div>
+          <div><dt>Text flickers back a frame while typing</dt><dd><p>Frames from the discrete card weren't reaching the screen in order. ZSS_AirLock now presents through the screen's GPU where needed. If you set <code>ZSS_PRESENT=direct</code>, remove it.</p></dd></div>
+          <div><dt>Lending is refused: modules still in use</dt><dd><p>Something still uses <code>nvidia_drm</code> or its neighbours, often the display server or login manager. Install with <code>--vm-passthrough</code> and reboot, so that they stay off the card's display nodes.</p></dd></div>
+          <div><dt>QEMU refuses the group (“no interrupt remapping”)</dt><dd><p>The firmware's interrupt-remapping table is broken. Allow unsafe interrupts for that run only: see <a href="#lend-mbp">On the reference laptop</a>.</p></dd></div>
+          <div><dt>The card was lost while a game was running</dt><dd><p>Not recoverable yet: the desktop survives, but the card needs a reboot. <code>zssctl status</code> shows <code>state=lost</code>.</p></dd></div>
+          <div><dt>Something went wrong during installation</dt><dd><p>The installer saved a report in <code>~/.zss/</code> and offered to send it. <code>~/.zss/debug.log</code> holds the facts and the installer's own messages either way.</p></dd></div>
+        </dl>
+        <h3>Where to look</h3>
+        <pre><code>zssctl status                   <span class="c"># the daemon's view</span>
+journalctl -u zssd -b           <span class="c"># the daemon's log</span>
+sudo dmesg | grep -E 'zss|NVRM' <span class="c"># ZSS_Interceptor and the driver</span>
+ZSS_DEBUG=1 zss-run program     <span class="c"># [ZSS_AirLock] messages on the terminal</span>
+zss-nvidia-patch status         <span class="c"># the driver patch</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="licence">
+    <div class="wrap">
+      <div><p class="kicker">Reference</p><h2>Licence</h2><p class="sub">Free software.</p></div>
+      <div class="prose">
+        <p>ZrnSelectiveSuspend is Copyright © 2026 Zerone Laboratories, released under the <b>GNU General Public License, version 2 only</b>. Every source file names it in an <code>SPDX-License-Identifier</code> line. It comes with no warranty: it cuts power to hardware and patches a kernel driver, and you use it at your own risk.</p>
+        <ul>
+          <li><b>The NVIDIA driver patch</b>: the lines it adds are under the MIT licence, so that they can be built into NVIDIA's driver. The lines of NVIDIA's code it quotes remain NVIDIA's.</li>
+          <li><b>Vulkan-Headers</b>, fetched at build time from Khronos, are under their own licences (Apache-2.0 or MIT).</li>
+          <li>The hash in <code>src/common/zss_hash.c</code> is MurmurHash3 by Austin Appleby, which is in the public domain.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div><span style="font-weight:500">ZrnSelectiveSuspend</span></div>
+    <div>
+      <p>Zerone Laboratories</p>
+      <p class="mute">GPL-2.0-only</p>
+    </div>
+    <div>
+      <p><a href="https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend">Source and releases on GitHub</a></p>
+      <p class="mute">Proven on a MacBookPro9,1, October 2026</p>
+    </div>
+  </div>
+</footer>
+
+</div>
+</div>
+
+<script>
+(function () {
+  // Theme toggle
+  var root = document.documentElement;
+  var btn = document.getElementById('theme');
+  var mq = window.matchMedia('(prefers-color-scheme: dark)');
+  function isDark() {
+    var t = root.getAttribute('data-theme');
+    return t ? t === 'dark' : mq.matches;
+  }
+  function sync() {
+    var d = isDark();
+    btn.textContent = d ? 'Light mode' : 'Dark mode';
+    btn.setAttribute('aria-pressed', String(d));
+  }
+  btn.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('zss-theme', next); } catch (e) {}
+    sync();
+  });
+  try { var saved = localStorage.getItem('zss-theme'); if (saved) root.setAttribute('data-theme', saved); } catch (e) {}
+  mq.addEventListener && mq.addEventListener('change', sync);
+  sync();
+
+  // Copy buttons: the title bar's command, and any code block given a copy button below
+  function copyText(text, button) {
+    function done(ok) {
+      var was = button.getAttribute('data-label') || button.textContent;
+      button.setAttribute('data-label', was);
+      button.textContent = ok ? 'Copied' : 'Select';
+      setTimeout(function () { button.textContent = was; }, 1500);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    } else {
+      var t = document.createElement('textarea');
+      t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(t); done(ok);
+    }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function (b) {
+    b.addEventListener('click', function () {
+      copyText(document.getElementById(b.getAttribute('data-copy')).textContent, b);
+    });
+  });
+
+  // Mobile menu
+  var menu = document.getElementById('menu');
+  var nav = document.getElementById('side-nav');
+  menu.addEventListener('click', function () {
+    var open = nav.classList.toggle('open');
+    menu.setAttribute('aria-expanded', String(open));
+    menu.textContent = open ? 'Close' : 'Menu';
+  });
+  nav.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A' && nav.classList.contains('open')) {
+      nav.classList.remove('open');
+      menu.setAttribute('aria-expanded', 'false');
+      menu.textContent = 'Menu';
+    }
+  });
+
+  // Mark the current topic in the sidebar
+  var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'));
+  var targets = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+  var ticking = false;
+  function spy() {
+    var current = 0;
+    for (var i = 1; i < targets.length; i++) {
+      if (targets[i] && targets[i].getBoundingClientRect().top <= 160) current = i;
+    }
+    links.forEach(function (a, i) {
+      if (i === current) a.setAttribute('aria-current', 'true');
+      else a.removeAttribute('aria-current');
+    });
+    ticking = false;
+  }
+  window.addEventListener('scroll', function () {
+    if (!ticking) { ticking = true; requestAnimationFrame(spy); }
+  }, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>
