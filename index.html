@@ -3,8 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ZrnSelectiveSuspend</title>
-<meta name="description" content="Take the graphics card out of a running Linux desktop and give it back: programs move to the other GPU while they draw, the card is switched off or lent to a virtual machine, and a card that loses power comes back without a reboot. Setup, use and internals.">
+<title>ZrnSelectiveSuspend: switch a Linux GPU off and pass it through, with no reboot</title>
+<meta name="description" content="Take the graphics card out of a running Linux desktop and give it back with no reboot and no new session: programs move to the other GPU while they draw, the card is switched off or passed through to a virtual machine, and a card that loses power comes back. Setup, use and internals.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://zerone-laboratories.github.io/zss/">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="sitemap" type="application/xml" href="sitemap.xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ZrnSelectiveSuspend">
+<meta property="og:title" content="ZrnSelectiveSuspend: switch a Linux GPU off and pass it through, with no reboot">
+<meta property="og:description" content="Take the graphics card out of a running Linux desktop and give it back with no reboot and no new session: programs move to the other GPU while they draw, the card is switched off or passed through to a virtual machine, and a card that loses power comes back. Setup, use and internals.">
+<meta property="og:url" content="https://zerone-laboratories.github.io/zss/">
+<meta property="og:image" content="https://zerone-laboratories.github.io/zss/assets/demo-power-off-on.jpg">
+<meta property="og:locale" content="en_AU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ZrnSelectiveSuspend: switch a Linux GPU off and pass it through, with no reboot">
+<meta name="twitter:description" content="Take the graphics card out of a running Linux desktop and give it back with no reboot and no new session: programs move to the other GPU while they draw, the card is switched off or passed through to a virtual machine, and a card that loses power comes back. Setup, use and internals.">
+<meta name="twitter:image" content="https://zerone-laboratories.github.io/zss/assets/demo-power-off-on.jpg">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ZrnSelectiveSuspend",
+  "alternateName": "ZSS",
+  "description": "Take the graphics card out of a running Linux desktop and give it back with no reboot and no new session: programs move to the other GPU while they draw, the card is switched off or passed through to a virtual machine, and a card that loses power comes back. Setup, use and internals.",
+  "url": "https://zerone-laboratories.github.io/zss/",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Linux",
+  "license": "https://www.gnu.org/licenses/old-licenses/gpl-2.0.html",
+  "softwareVersion": "0.1",
+  "codeRepository": "https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend",
+  "downloadUrl": "https://github.com/z3r0n3br4instorm/ZrnSelectiveSuspend/releases/latest",
+  "screenshot": "https://zerone-laboratories.github.io/zss/assets/demo-power-off-on.jpg",
+  "author": { "@type": "Organization", "name": "Zerone Laboratories", "url": "https://github.com/Zerone-Laboratories" },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
