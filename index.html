@@ -198,7 +198,6 @@
   @media (min-width: 1181px) {
     /* The landing is one screen: everything above the first wiki topic fits below the title bar. */
     .hero .wrap { min-height: calc(100dvh - var(--bar)); }
-    .device img { max-height: max(140px, calc(100dvh - var(--bar) - 34rem)); width: auto; }
   }
   .alpha-note { border: 1px solid var(--line); background: var(--panel); margin-top: 1.1rem; }
   .alpha-note p { margin: 0; padding: 0.6rem 0.9rem; font-size: 0.875rem; line-height: 1.4; color: var(--ink); border-bottom: 1px solid var(--line); max-width: none; }
@@ -228,6 +227,10 @@
   .device { border: 1px solid var(--line); background: var(--panel); }
   .device .shot { padding: 1rem 1.5rem 0.25rem; }
   .device img { width: 100%; max-width: 340px; height: auto; margin: 0 auto; filter: grayscale(1) contrast(1.02); }
+  @media (min-width: 1181px) {
+    /* On a short screen the picture shrinks, keeping its proportions: after the rule above, so that its width wins. */
+    .device img { width: auto; max-height: max(140px, calc(100dvh - var(--bar) - 28rem)); }
+  }
   .device figcaption { border-top: 1px solid var(--line); padding: 0.6rem 0.9rem; font-size: 0.875rem; display: flex; justify-content: space-between; gap: 1rem; }
   .device figcaption span:first-child { text-transform: uppercase; letter-spacing: 0.06em; color: var(--mute); }
   .device-info { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-top: 0; background: var(--panel); }
