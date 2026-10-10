@@ -595,7 +595,7 @@
   <!-- ============================== START ============================== -->
   <section class="section" id="demos">
     <div class="wrap">
-      <div><p class="kicker">Start</p><h2>Demos</h2><p class="sub">Recorded on the MacBook Pro, 9 October 2026. No cuts except where noted.</p></div>
+      <div><p class="kicker">Start</p><h2>Demos</h2><p class="sub">Recorded on the MacBook Pro, 9 and 11 October 2026. No cuts except where noted.</p></div>
       <div class="prose">
         <figure class="demo">
           <video controls muted playsinline preload="metadata" poster="assets/demo-power-off-on.jpg">
@@ -615,6 +615,17 @@
             <b>Lending the card to a virtual machine and taking it back, without a reboot</b>
             <p><code>zssctl lend</code> moves the cube off the card and hands it, with its audio function and the Thunderbolt controller in its isolation group, to <code>vfio-pci</code> (1.1 s). A CachyOS live image then boots in QEMU with the card passed through; the boot is sped up. Inside the guest, <code>lspci</code> shows the GT 650M and the guest's <code>nouveau</code> reads its chip ID. After the guest shuts down, <code>zssctl reclaim</code> power-cycles the card and gives it back to the host's driver (4.6 s), and the cube moves back.</p>
             <p>The guest's driver stops after reading the chip: the Mac Edition card carries no video BIOS of its own, so <code>nouveau</code> finds none. Giving QEMU a copy of it (<code>romfile=</code>) is the next step. One failed launch, a permissions error on <code>/dev/vfio</code>, is cut out.</p>
+          </figcaption>
+        </figure>
+        <figure class="demo">
+          <video controls muted playsinline preload="metadata" poster="assets/demo-surprise-cut.jpg">
+            <source src="assets/demo-surprise-cut.mp4" type="video/mp4">
+          </video>
+          <figcaption>
+            <b>Cutting the card's power rail with nothing warned, as if it fell off the bus</b>
+            <p>Recorded 11 October 2026. Top left, the gmux power rail register, the PCI bus and the states of ZSS_Interceptor and <code>zssd</code>, read five times a second. The test script writes the gmux register straight from user space: the driver is running, <code>vkcube</code> is drawing on the card, and nothing is suspended or told first.</p>
+            <p>The rail drops to 0 and the bus reads <code>ffff</code>. ZSS_Interceptor reports the loss 50 ms later; NVIDIA's driver logs Xid 79, "GPU has fallen off the bus". ZSS_AirLock moves the cube to the Intel GPU 3.4 s after the cut and the X server keeps answering. The cube keeps turning but goes black: its texture lived only in the card's memory, which went with the power. <code>zssctl on</code> brings the card back to its driver (3.7 s) and <code>nvidia-smi</code> finds it again.</p>
+            <p>A real loss stays in the logs (<code>journalctl</code> and <code>dmesg</code>), not in front of the program. Until the next restart, the card can't be switched off or lent again: NVIDIA's display modules still hold the lost one. One typing slip is left in.</p>
           </figcaption>
         </figure>
       </div>
